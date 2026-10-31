@@ -1,10 +1,9 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { ROOT } from '../support/analysis.js';
-import { cpSync } from 'node:fs';
 
 // The compiled program, run as a separate process: what a user (or a script) actually gets.
 
