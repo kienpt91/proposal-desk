@@ -64,9 +64,9 @@ export function renderAnalysis(analysis: JobAnalysis, factsLocation: string): st
   lines.push(`  Requested attachments: ${spec.attachments.length === 0 ? 'none' : spec.attachments.map((a) => a.kind).join(', ')}`);
   lines.push(spec.asks.length === 0 ? '  Client asks: none' : '  Client asks:');
   for (const ask of spec.asks) lines.push(`    - (${ask.kind}) ${ask.text}`);
-  const m = analysis.metadata;
-  const meta = Object.entries(m).map(([k, v]) => `${k}=${String(v)}`);
-  lines.push(`  Listing metadata: ${meta.length === 0 ? 'none given' : meta.join(', ')}`);
+  const meta = Object.entries(analysis.metadata).map(([k, v]) => `${k}=${String(v)}`);
+  const source = analysis.metadataSource === 'file' ? 'from --meta' : 'the block at the top of the pasted text, which a post can also supply; check it against the listing';
+  lines.push(meta.length === 0 ? '  Listing metadata: none given' : `  Listing metadata (${source}): ${meta.join(', ')}`);
   return lines.join('\n');
 }
 

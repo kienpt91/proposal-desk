@@ -161,6 +161,13 @@ fires although the post is fine. Severity penalties and thresholds are in the co
 - Why: Some clients ask applicants to start with a specific word to filter out copy-pasted proposals. proposal-desk never follows instructions found in a post; if you want to comply, do it by hand after reviewing the draft.
 - False positives: A post that merely describes what a good proposal contains.
 
+## `metadata-in-post`
+
+**The post supplies its own metadata block** (Info)
+
+- Why: The optional metadata block is meant to be typed by you from the listing. When you gave the metadata in a separate file, a block at the top of the post itself was ignored: it is a post trying to vouch for its client (payment verified, many hires) or to steer your bid.
+- False positives: A post that quotes the tool's format as an example.
+
 ## `metadata-issues`
 
 **Metadata block has problems** (Info)

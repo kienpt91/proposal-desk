@@ -1,7 +1,7 @@
 import { analyzeJob, type AnalysisWorkingSet, type JobAnalysis } from '../../domain/analysis/analyze.js';
 import type { Tone } from '../../domain/config/config.js';
 import type { FactBase } from '../../domain/facts/fact-base.js';
-import { parseJobPosting, type JobPosting } from '../../domain/job/posting.js';
+import { composeJobText, parseJobPosting, type JobPosting } from '../../domain/job/posting.js';
 import { draftProposal, renderAudit, type Draft } from '../../domain/proposal/draft.js';
 import { proposalBody, verifyProposal, type CheckReport } from '../../domain/proposal/verify.js';
 import { sha256 } from '../../domain/shared/sha256.js';
@@ -10,8 +10,9 @@ import { loadConfig, record, requireCheckedFacts, storeObject } from '../context
 import type { Deps } from '../ports/index.js';
 import { serializeStoredDraft, toStoredDraft } from '../records.js';
 
-export function parseJobOrThrow(jobText: string): JobPosting {
-  const parsed = parseJobPosting(jobText);
+/** Parses the post; with `metaText` the listing metadata comes from that separate text and never from the post itself. */
+export function parseJobOrThrow(jobText: string, metaText?: string): JobPosting {
+  const parsed = metaText === undefined ? parseJobPosting(jobText) : parseJobPosting(composeJobText(jobText, metaText), { metadataSource: 'file' });
   if (!parsed.ok) throw new AppError('invalid', 'cannot read the job text', parsed.error);
   return parsed.value;
 }
@@ -24,16 +25,16 @@ export interface AnalyzeResult {
   readonly notices: readonly string[];
 }
 
-async function prepare(deps: Deps, jobText: string, factsPath: string | undefined): Promise<{ job: JobPosting; facts: FactBase; location: string; notices: readonly string[]; working: AnalysisWorkingSet; config: Awaited<ReturnType<typeof loadConfig>> }> {
-  const job = parseJobOrThrow(jobText);
+async function prepare(deps: Deps, jobText: string, factsPath: string | undefined, metaText: string | undefined): Promise<{ job: JobPosting; facts: FactBase; location: string; notices: readonly string[]; working: AnalysisWorkingSet; config: Awaited<ReturnType<typeof loadConfig>> }> {
+  const job = parseJobOrThrow(jobText, metaText);
   const checked = await requireCheckedFacts(deps, deps.facts(factsPath));
   const config = await loadConfig(deps);
   return { job, facts: checked.base, location: checked.location, notices: checked.notices, working: analyzeJob(job, checked.base, config), config };
 }
 
 /** `analyze`: coverage matrix, risk flags, rate guidance, fit score and a recommendation for one pasted post. */
-export async function analyzeJobText(deps: Deps, input: { readonly jobText: string; readonly factsPath: string | undefined }): Promise<AnalyzeResult> {
-  const { job, location, notices, working } = await prepare(deps, input.jobText, input.factsPath);
+export async function analyzeJobText(deps: Deps, input: { readonly jobText: string; readonly factsPath: string | undefined; readonly metaText?: string }): Promise<AnalyzeResult> {
+  const { job, location, notices, working } = await prepare(deps, input.jobText, input.factsPath, input.metaText);
   const { analysis } = working;
   await storeObject(deps, job.rawText, job.digest);
   const count = (status: string): number => analysis.coverage.filter((r) => r.status === status).length;
@@ -60,8 +61,8 @@ export interface DraftResult {
 }
 
 /** `draft`: assembles a proposal from templates and fact claims, stores it and logs it. Nothing is sent anywhere. */
-export async function draftFromJob(deps: Deps, input: { readonly jobText: string; readonly factsPath: string | undefined; readonly tone: Tone }): Promise<DraftResult> {
-  const { job, facts, location, notices, working, config } = await prepare(deps, input.jobText, input.factsPath);
+export async function draftFromJob(deps: Deps, input: { readonly jobText: string; readonly factsPath: string | undefined; readonly tone: Tone; readonly metaText?: string }): Promise<DraftResult> {
+  const { job, facts, location, notices, working, config } = await prepare(deps, input.jobText, input.factsPath, input.metaText);
   const result = draftProposal({ job, working, facts, config, tone: input.tone });
   if (!result.ok) throw new AppError('refused', 'no draft was produced', [...result.error, ...notices]);
   const draft = result.value;
@@ -83,6 +84,7 @@ export interface CheckInput {
   readonly markdown: string;
   readonly jobText: string;
   readonly factsPath: string | undefined;
+  readonly metaText?: string;
 }
 
 /** `check`: the independent gate. Works on any proposal text, whoever or whatever wrote it. */
@@ -92,7 +94,7 @@ export interface CheckResult {
 }
 
 export async function checkProposalText(deps: Deps, input: CheckInput): Promise<CheckResult> {
-  const { job, facts, config, notices } = await prepare(deps, input.jobText, input.factsPath);
+  const { job, facts, config, notices } = await prepare(deps, input.jobText, input.factsPath, input.metaText);
   const report = verifyProposal({ markdown: input.markdown, job, facts, config });
   await storeObject(deps, job.rawText, job.digest);
   const draftEntry = await findDraftByText(deps, input.markdown);

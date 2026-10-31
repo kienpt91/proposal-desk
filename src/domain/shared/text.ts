@@ -60,6 +60,18 @@ export function joinList(items: readonly string[]): string {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
+/**
+ * Wraps text in an inline Markdown code span that cannot be closed from the inside: the fence is one backtick longer than the
+ * longest run of backticks in the text. Newlines become spaces. Job-derived text goes into Markdown only through this.
+ */
+export function codeSpan(text: string): string {
+  const flat = text.replace(/\s*\n\s*/g, ' ');
+  let longest = 0;
+  for (const run of flat.match(/`+/g) ?? []) longest = Math.max(longest, run.length);
+  const fence = '`'.repeat(longest + 1);
+  return longest > 0 ? `${fence} ${flat} ${fence}` : `${fence}${flat}${fence}`;
+}
+
 /** Truncates to `max` characters (code points) with an ellipsis. */
 export function truncate(text: string, max: number): string {
   const chars = [...text];

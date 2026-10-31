@@ -43,10 +43,16 @@ export interface Command {
 }
 
 const FACTS: FlagSpec = { name: 'facts', kind: 'string', value: '<file>', help: 'facts file (default: <state>/facts.json)' };
+const META: FlagSpec = { name: 'meta', kind: 'string', value: '<file>', help: 'listing metadata (proposals, client hires, ...) in a separate file, so it cannot come from the post itself' };
 const JSON_FLAG: FlagSpec = { name: 'json', kind: 'boolean', help: 'print machine-readable JSON' };
 
 async function readInput(io: CliIo, path: string, limit: number): Promise<string> {
   return path === '-' ? io.readStdin(limit) : readText(path, limit, USER_FILE);
+}
+
+async function readMeta(io: CliIo, args: ParsedArgs): Promise<string | undefined> {
+  const path = flagString(args, 'meta');
+  return path === undefined ? undefined : readInput(io, path, SIZE_LIMITS.metaFile);
 }
 
 function printNotices(out: Output, notices: readonly string[]): void {
@@ -163,10 +169,11 @@ export const COMMANDS: readonly Command[] = [
     summary: 'score a pasted job post against your facts',
     description: 'Reads the post from a file, or from standard input with "-". Prints the coverage matrix, risk flags, rate guidance, the fit score with its formula and a recommendation. Nothing is fetched or sent.',
     positionals: [{ name: 'job' }],
-    flags: [FACTS, JSON_FLAG],
+    flags: [META, FACTS, JSON_FLAG],
     run: async ({ args, out, io, deps }) => {
       const jobText = await readInput(io, args.positionals[0] as string, SIZE_LIMITS.jobFile);
-      const result = await analyzeJobText(deps, { jobText, factsPath: flagString(args, 'facts') });
+      const metaText = await readMeta(io, args);
+      const result = await analyzeJobText(deps, { jobText, factsPath: flagString(args, 'facts'), ...(metaText === undefined ? {} : { metaText }) });
       printNotices(out, result.notices);
       if (flagBool(args, 'json')) out.json(result.analysis);
       else out.out(renderAnalysis(result.analysis, result.factsLocation));
@@ -178,11 +185,12 @@ export const COMMANDS: readonly Command[] = [
     summary: 'draft a proposal in which every claim is a verified fact',
     description: 'Prints Markdown with a footnote on every claim, then provenance and review notes. The draft is stored; use its id with check, approve and export. Deterministic: the same inputs give the same bytes.',
     positionals: [{ name: 'job' }],
-    flags: [{ name: 'tone', kind: 'string', value: `<${TONES.join('|')}>`, help: 'template set (default plain)' }, FACTS, JSON_FLAG],
+    flags: [{ name: 'tone', kind: 'string', value: `<${TONES.join('|')}>`, help: 'template set (default plain)' }, META, FACTS, JSON_FLAG],
     run: async ({ args, out, io, deps }) => {
       const tone: Tone = flagString(args, 'tone') === undefined ? 'plain' : oneOf<Tone>(flagString(args, 'tone'), TONES, 'tone');
       const jobText = await readInput(io, args.positionals[0] as string, SIZE_LIMITS.jobFile);
-      const result = await draftFromJob(deps, { jobText, factsPath: flagString(args, 'facts'), tone });
+      const metaText = await readMeta(io, args);
+      const result = await draftFromJob(deps, { jobText, factsPath: flagString(args, 'facts'), tone, ...(metaText === undefined ? {} : { metaText }) });
       printNotices(out, result.notices);
       if (flagBool(args, 'json')) out.json({ draft: result.draft, reviewNotes: reviewNotes(result.analysis, result.draft) });
       else {
@@ -198,14 +206,15 @@ export const COMMANDS: readonly Command[] = [
     summary: 'independently verify a proposal, however it was written',
     description: 'Parses the proposal, matches each sentence to your facts by content and reports numbers or capabilities that no verified fact supports, boilerplate, exaggeration, contact details, length and job-constraint mismatches. Exit status 1 when there are errors.',
     positionals: [{ name: 'proposal' }],
-    flags: [{ name: 'job', kind: 'string', value: '<file|->', help: 'the job post the proposal answers' }, FACTS, JSON_FLAG],
+    flags: [{ name: 'job', kind: 'string', value: '<file|->', help: 'the job post the proposal answers' }, META, FACTS, JSON_FLAG],
     run: async ({ args, out, io, deps }) => {
       const proposalPath = args.positionals[0] as string;
       const jobPath = need(args, 'job');
       if (proposalPath === '-' && jobPath === '-') throw new UsageError('only one of the proposal and --job can be read from standard input');
       const markdown = await readInput(io, proposalPath, SIZE_LIMITS.proposalFile);
       const jobText = await readInput(io, jobPath, SIZE_LIMITS.jobFile);
-      const { report, notices } = await checkProposalText(deps, { markdown, jobText, factsPath: flagString(args, 'facts') });
+      const metaText = await readMeta(io, args);
+      const { report, notices } = await checkProposalText(deps, { markdown, jobText, factsPath: flagString(args, 'facts'), ...(metaText === undefined ? {} : { metaText }) });
       printNotices(out, notices);
       if (flagBool(args, 'json')) out.json(report);
       else out.out(renderCheck(report));

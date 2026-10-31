@@ -6,7 +6,7 @@ import type { FactBase } from '../facts/fact-base.js';
 import type { JobPosting } from '../job/posting.js';
 import { digestOf, type Json } from '../shared/canonical-json.js';
 import { fail, ok, type Result } from '../shared/result.js';
-import { joinList, wordCount } from '../shared/text.js';
+import { codeSpan, joinList, wordCount } from '../shared/text.js';
 import { verifyProposal } from './verify.js';
 
 export type SentenceRole = 'opening' | 'evidence' | 'gap' | 'question' | 'availability' | 'rate' | 'closing';
@@ -227,11 +227,11 @@ export function reviewNotes(analysis: JobAnalysis, draft: Draft): string[] {
   const lines: string[] = [];
   lines.push(`Recommendation: ${analysis.verdict.recommendation} (fit ${analysis.score.value}).`);
   for (const flag of analysis.flags.filter((f) => f.severity !== 'info')) {
-    lines.push(`${flag.severity === 'hard' ? 'HARD WARNING' : 'Warning'}: ${flag.title}. ${flag.detail}`);
+    lines.push(`${flag.severity === 'hard' ? 'HARD WARNING' : 'Warning'}: ${flag.title}. ${flag.ruleId === 'metadata-issues' ? codeSpan(flag.detail) : flag.detail}`);
   }
-  for (const ask of analysis.spec.asks) lines.push(`The client asks (answer by hand): ${ask.text}`);
+  for (const ask of analysis.spec.asks) lines.push(`The client asks (answer by hand): ${codeSpan(ask.text)}`);
   for (const attachment of analysis.spec.attachments) lines.push(`The client asks for: ${attachment.kind}. Add it yourself if you choose to.`);
-  for (const flag of analysis.flags.filter((f) => f.ruleId === 'screening-instruction')) lines.push(`Screening instruction in the post (not followed): ${flag.excerpt ?? ''}`);
+  for (const flag of analysis.flags.filter((f) => f.ruleId === 'screening-instruction')) lines.push(`Screening instruction in the post (not followed): ${codeSpan(flag.excerpt ?? '')}`);
   const weak = draft.citations.filter((c) => c.trust !== 'verified' && !['availability', 'rate', 'constraint'].includes(c.category));
   if (weak.length > 0) lines.push(`Claims resting on evidence the tool could not verify: ${weak.map((c) => `${c.factId} (${c.trust})`).join(', ')}.`);
   lines.push(...draft.notes);

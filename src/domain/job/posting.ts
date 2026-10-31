@@ -42,6 +42,10 @@ export interface JobPosting {
   readonly matchBody: string;
   readonly title: string;
   readonly metadata: JobMetadata;
+  /** Where the metadata came from: a block at the top of the pasted text (which a post can supply too), a separate file, or nowhere. */
+  readonly metadataSource: 'none' | 'inline' | 'file';
+  /** With a separate metadata file: the post itself starts with a metadata block of its own (ignored, but suspicious). */
+  readonly metadataInPost: boolean;
   /** Problems with the metadata block (unknown keys, bad values). The offending lines are ignored. */
   readonly metadataIssues: readonly string[];
   /** Number of control, bidi or zero-width characters that were removed from the body. */
@@ -51,22 +55,24 @@ export interface JobPosting {
 }
 
 const OPEN = /^---\s*proposal-desk\s*$/;
-const KEYS: Readonly<Record<string, { key: keyof JobMetadata; kind: 'count' | 'bool' | 'amount' | 'currency' }>> = {
-  proposals: { key: 'proposals', kind: 'count' },
-  'client-hires': { key: 'clientHires', kind: 'count' },
-  'payment-verified': { key: 'paymentVerified', kind: 'bool' },
-  'account-age-days': { key: 'accountAgeDays', kind: 'count' },
-  'bid-min': { key: 'bidMin', kind: 'amount' },
-  'bid-max': { key: 'bidMax', kind: 'amount' },
-  currency: { key: 'currency', kind: 'currency' },
-};
+type KeySpec = { readonly key: keyof JobMetadata; readonly kind: 'count' | 'bool' | 'amount' | 'currency' };
+/** A Map, not an object: keys such as `constructor` and `toString` must not find anything. */
+const KEYS: ReadonlyMap<string, KeySpec> = new Map<string, KeySpec>([
+  ['proposals', { key: 'proposals', kind: 'count' }],
+  ['client-hires', { key: 'clientHires', kind: 'count' }],
+  ['payment-verified', { key: 'paymentVerified', kind: 'bool' }],
+  ['account-age-days', { key: 'accountAgeDays', kind: 'count' }],
+  ['bid-min', { key: 'bidMin', kind: 'amount' }],
+  ['bid-max', { key: 'bidMax', kind: 'amount' }],
+  ['currency', { key: 'currency', kind: 'currency' }],
+]);
 
 function parseMetadata(lines: readonly string[], issues: string[]): JobMetadata {
   const meta: { -readonly [K in keyof JobMetadata]: JobMetadata[K] } = {};
   for (const line of lines) {
     if (line.trim() === '') continue;
     const m = /^([a-z-]+)\s*:\s*(.*)$/.exec(line.trim());
-    const spec = m === null ? undefined : KEYS[m[1] as string];
+    const spec = m === null ? undefined : KEYS.get(m[1] as string);
     if (m === null || spec === undefined) {
       issues.push(`metadata line ignored (unknown key): ${truncate(stripUnsafe(line.trim()), 40)}`);
       continue;
@@ -94,8 +100,23 @@ function parseMetadata(lines: readonly string[], issues: string[]): JobMetadata 
   return meta;
 }
 
+/**
+ * Puts the listing metadata from a separate file in front of the post, so that the metadata is never taken from the post
+ * itself. The file holds `key: value` lines, optionally inside the `---proposal-desk` fences.
+ */
+export function composeJobText(post: string, metaText: string): string {
+  const lines = normalizeNewlines(metaText).split('\n');
+  const first = lines.findIndex((l) => l.trim() !== '');
+  let meta = lines;
+  if (first !== -1 && OPEN.test((lines[first] as string).trim())) {
+    const close = lines.findIndex((l, i) => i > first && l.trim() === '---');
+    meta = lines.slice(first + 1, close === -1 ? undefined : close);
+  }
+  return `---proposal-desk\n${meta.filter((l) => l.trim() !== '').join('\n')}\n---\n${post}`;
+}
+
 /** Parses pasted job text. Never throws; returns an error only for empty or oversized input. */
-export function parseJobPosting(input: string): Result<JobPosting> {
+export function parseJobPosting(input: string, options: { readonly metadataSource?: 'inline' | 'file' } = {}): Result<JobPosting> {
   const rawText = normalizeNewlines(input);
   if (rawText.trim() === '') return fail(['the job text is empty']);
   if (rawText.length > JOB_LIMITS.maxChars) return fail([`the job text is longer than ${JOB_LIMITS.maxChars} characters`]);
@@ -104,6 +125,7 @@ export function parseJobPosting(input: string): Result<JobPosting> {
   let first = 0;
   while (first < lines.length && (lines[first] as string).trim() === '') first++;
   let metadata: JobMetadata = {};
+  let metadataSource: JobPosting['metadataSource'] = 'none';
   const issues: string[] = [];
   let bodyLines = lines;
   if (first < lines.length && OPEN.test((lines[first] as string).trim())) {
@@ -112,6 +134,7 @@ export function parseJobPosting(input: string): Result<JobPosting> {
       issues.push('metadata block is not closed with ---; treated as part of the post');
     } else {
       metadata = parseMetadata(lines.slice(first + 1, close), issues);
+      metadataSource = options.metadataSource ?? 'inline';
       bodyLines = lines.slice(close + 1);
     }
   }
@@ -123,5 +146,7 @@ export function parseJobPosting(input: string): Result<JobPosting> {
     (body.split('\n').find((line) => line.trim() !== '') as string).trim().replace(/^#{1,6}\s*/, ''),
     JOB_LIMITS.titleChars,
   );
-  return ok({ digest: sha256(rawText), rawText, body, matchBody: foldForMatch(body), title, metadata, metadataIssues: issues, hiddenCharacters, lookalikes: countLookalikes(body) });
+  const firstBodyLine = bodyLines.find((l) => l.trim() !== '');
+  const metadataInPost = metadataSource === 'file' && firstBodyLine !== undefined && OPEN.test(stripUnsafe(firstBodyLine).trim());
+  return ok({ digest: sha256(rawText), rawText, body, matchBody: foldForMatch(body), title, metadata, metadataSource, metadataInPost, metadataIssues: issues, hiddenCharacters, lookalikes: countLookalikes(body) });
 }

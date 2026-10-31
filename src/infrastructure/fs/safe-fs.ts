@@ -11,6 +11,7 @@ export const SIZE_LIMITS = {
   configFile: 65_536,
   object: 524_288,
   jobFile: 262_144,
+  metaFile: 16_384,
   proposalFile: 262_144,
   logFile: 134_217_728,
   evidenceFile: 268_435_456,

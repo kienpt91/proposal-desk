@@ -189,6 +189,13 @@ export const RISK_RULES: readonly RiskRule[] = [
     falsePositives: 'A post that merely describes what a good proposal contains.',
   },
   {
+    id: 'metadata-in-post',
+    severity: 'info',
+    title: 'The post supplies its own metadata block',
+    rationale: 'The optional metadata block is meant to be typed by you from the listing. When you gave the metadata in a separate file, a block at the top of the post itself was ignored: it is a post trying to vouch for its client (payment verified, many hires) or to steer your bid.',
+    falsePositives: 'A post that quotes the tool\'s format as an example.',
+  },
+  {
     id: 'metadata-issues',
     severity: 'info',
     title: 'Metadata block has problems',
@@ -383,6 +390,7 @@ const DETECTORS: Readonly<Record<string, Detector>> = {
     }
     return [];
   },
+  'metadata-in-post': ({ job }) => (job.metadataInPost ? [flag('metadata-in-post', 'The post starts with a metadata block of its own; it was ignored in favour of the metadata file.')] : []),
   'metadata-issues': ({ job }) => (job.metadataIssues.length > 0 ? [flag('metadata-issues', job.metadataIssues.join('; '))] : []),
 };
 

@@ -13,6 +13,7 @@ export interface JobAnalysis {
   readonly configVersion: number;
   readonly title: string;
   readonly metadata: JobMetadata;
+  readonly metadataSource: JobPosting['metadataSource'];
   readonly spec: Omit<JobSpec, 'sentences'>;
   readonly coverage: readonly CoverageRow[];
   readonly rate: RateGuidance;
@@ -38,6 +39,6 @@ export function analyzeJob(job: JobPosting, facts: FactBase, config: Config): An
   void _sentences;
   return {
     spec,
-    analysis: { jobDigest: job.digest, configVersion: config.version, title: job.title, metadata: job.metadata, spec: publicSpec, coverage, rate, flags, score, verdict },
+    analysis: { jobDigest: job.digest, configVersion: config.version, title: job.title, metadata: job.metadata, metadataSource: job.metadataSource, spec: publicSpec, coverage, rate, flags, score, verdict },
   };
 }
