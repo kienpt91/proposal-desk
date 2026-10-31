@@ -103,13 +103,22 @@ export class InMemoryFactStore implements FactStore {
   }
 }
 
-/** Evidence files are a map from reference to content. */
+/** Evidence files are a map from reference to content; `pinned` maps a reference straight to a digest (for tests that do not care about file content). */
 export class FakeEvidence implements EvidenceChecker {
+  readonly pinned = new Map<string, string>();
+
   constructor(readonly files = new Map<string, string>()) {}
+
+  /** Makes every checkable fact of `base` verify, as if its evidence file still matched. */
+  pin(base: FactBase): void {
+    for (const fact of base.facts) if (fact.evidence.digest !== undefined) this.pinned.set(fact.evidence.reference, fact.evidence.digest);
+  }
 
   async digestOf(reference: string): Promise<EvidenceDigest> {
     const content = this.files.get(reference);
-    return content === undefined ? { ok: false, reason: 'no such file' } : { ok: true, digest: sha256(content) };
+    if (content !== undefined) return { ok: true, digest: sha256(content) };
+    const pinned = this.pinned.get(reference);
+    return pinned === undefined ? { ok: false, reason: 'no such file' } : { ok: true, digest: pinned };
   }
 }
 
@@ -146,7 +155,7 @@ export interface Harness extends Deps {
 }
 
 /** All ports in memory. `facts(path)` always returns the same single store, whatever the path. */
-export function harness(options: { readonly facts?: FactBase; readonly config?: Config } = {}): Harness {
+export function harness(options: { readonly facts?: FactBase; readonly config?: Config; readonly pin?: boolean } = {}): Harness {
   const clock = new FixedClock();
   const log = new InMemoryLogStore();
   const objects = new InMemoryObjectStore();
@@ -156,6 +165,7 @@ export function harness(options: { readonly facts?: FactBase; readonly config?: 
   const sink = new MemorySink();
   const factStore = new InMemoryFactStore(options.facts);
   const evidence = new FakeEvidence();
+  if (options.pin === true && options.facts !== undefined) evidence.pin(options.facts);
   const handle: FactsHandle = { store: factStore, evidence };
   return {
     clock,

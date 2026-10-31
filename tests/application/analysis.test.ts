@@ -10,7 +10,7 @@ import { sha256 } from '../../src/domain/shared/sha256.js';
 import { harness } from '../support/fakes.js';
 import { EXAMPLE_JOB, exampleFacts } from '../support/analysis.js';
 
-const setup = () => harness({ facts: exampleFacts() });
+const setup = () => harness({ facts: exampleFacts(), pin: true });
 
 async function rejection(promise: Promise<unknown>): Promise<AppError> {
   try {
@@ -54,7 +54,7 @@ describe('analyzeJobText', () => {
 
   it('refuses a configuration file that differs from the defaults when nothing was ever applied', async () => {
     const edited = (setConfigValue(defaultConfig(), 'scoring.applyThreshold', '80') as { value: Config }).value;
-    const h = harness({ facts: exampleFacts(), config: edited });
+    const h = harness({ facts: exampleFacts(), config: edited, pin: true });
     expect((await rejection(analyzeJobText(h, { jobText: EXAMPLE_JOB, factsPath: undefined }))).message).toContain('no configuration was ever applied');
     h.configFake.current = defaultConfig();
     expect((await analyzeJobText(h, { jobText: EXAMPLE_JOB, factsPath: undefined })).analysis.configVersion).toBe(1);
@@ -157,14 +157,14 @@ describe('checkProposalText', () => {
   it('passes a draft and ties the check to it in the log', async () => {
     const h = setup();
     const { draft } = await draftFromJob(h, { jobText: EXAMPLE_JOB, factsPath: undefined, tone: 'plain' });
-    const report = await checkProposalText(h, { markdown: draft.text, jobText: EXAMPLE_JOB, factsPath: undefined });
+    const { report } = await checkProposalText(h, { markdown: draft.text, jobText: EXAMPLE_JOB, factsPath: undefined });
     expect(report.ok).toBe(true);
     expect(h.logFake.entries.at(-1)).toMatchObject({ type: 'proposal.checked', payload: { ok: true, errors: 0, draftId: draft.id, textDigest: sha256(draft.text) } });
   });
 
   it('reports violations for a hand-written proposal and logs them', async () => {
     const h = setup();
-    const report = await checkProposalText(h, { markdown: 'Dear Hiring Manager, I have 12 years of Kubernetes experience. Email me at a@b.io', jobText: EXAMPLE_JOB, factsPath: undefined });
+    const { report } = await checkProposalText(h, { markdown: 'Dear Hiring Manager, I have 12 years of Kubernetes experience. Email me at a@b.io', jobText: EXAMPLE_JOB, factsPath: undefined });
     expect(report.ok).toBe(false);
     const payload = h.logFake.entries.at(-1)?.payload;
     expect(payload).toMatchObject({ ok: false });

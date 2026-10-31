@@ -49,6 +49,10 @@ async function readInput(io: CliIo, path: string, limit: number): Promise<string
   return path === '-' ? io.readStdin(limit) : readText(path, limit, USER_FILE);
 }
 
+function printNotices(out: Output, notices: readonly string[]): void {
+  for (const notice of notices) out.err(`notice: ${notice}`);
+}
+
 function attrValue(raw: string): AttrValue {
   return /^-?\d+(?:\.\d+)?$/.test(raw) ? Number(raw) : raw;
 }
@@ -120,6 +124,7 @@ export const COMMANDS: readonly Command[] = [
     flags: [FACTS, JSON_FLAG],
     run: async ({ args, out, deps }) => {
       const result = await listFacts(deps, { factsPath: flagString(args, 'facts') });
+      printNotices(out, result.notices);
       if (flagBool(args, 'json')) out.json(result.assessments.map((a) => ({ ...a.fact, trust: a.trust, usable: a.usable, exclusions: a.exclusions })));
       else out.out(renderFacts(result.assessments, result.location));
       return 0;
@@ -162,6 +167,7 @@ export const COMMANDS: readonly Command[] = [
     run: async ({ args, out, io, deps }) => {
       const jobText = await readInput(io, args.positionals[0] as string, SIZE_LIMITS.jobFile);
       const result = await analyzeJobText(deps, { jobText, factsPath: flagString(args, 'facts') });
+      printNotices(out, result.notices);
       if (flagBool(args, 'json')) out.json(result.analysis);
       else out.out(renderAnalysis(result.analysis, result.factsLocation));
       return 0;
@@ -177,6 +183,7 @@ export const COMMANDS: readonly Command[] = [
       const tone: Tone = flagString(args, 'tone') === undefined ? 'plain' : oneOf<Tone>(flagString(args, 'tone'), TONES, 'tone');
       const jobText = await readInput(io, args.positionals[0] as string, SIZE_LIMITS.jobFile);
       const result = await draftFromJob(deps, { jobText, factsPath: flagString(args, 'facts'), tone });
+      printNotices(out, result.notices);
       if (flagBool(args, 'json')) out.json({ draft: result.draft, reviewNotes: reviewNotes(result.analysis, result.draft) });
       else {
         out.out(result.audit.trimEnd());
@@ -198,7 +205,8 @@ export const COMMANDS: readonly Command[] = [
       if (proposalPath === '-' && jobPath === '-') throw new UsageError('only one of the proposal and --job can be read from standard input');
       const markdown = await readInput(io, proposalPath, SIZE_LIMITS.proposalFile);
       const jobText = await readInput(io, jobPath, SIZE_LIMITS.jobFile);
-      const report = await checkProposalText(deps, { markdown, jobText, factsPath: flagString(args, 'facts') });
+      const { report, notices } = await checkProposalText(deps, { markdown, jobText, factsPath: flagString(args, 'facts') });
+      printNotices(out, notices);
       if (flagBool(args, 'json')) out.json(report);
       else out.out(renderCheck(report));
       return report.ok ? 0 : 1;

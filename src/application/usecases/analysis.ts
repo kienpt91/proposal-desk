@@ -6,7 +6,7 @@ import { draftProposal, renderAudit, type Draft } from '../../domain/proposal/dr
 import { proposalBody, verifyProposal, type CheckReport } from '../../domain/proposal/verify.js';
 import { sha256 } from '../../domain/shared/sha256.js';
 import { AppError } from '../errors.js';
-import { loadConfig, record, requireFacts, storeObject } from '../context.js';
+import { loadConfig, record, requireCheckedFacts, storeObject } from '../context.js';
 import type { Deps } from '../ports/index.js';
 import { serializeStoredDraft, toStoredDraft } from '../records.js';
 
@@ -20,19 +20,20 @@ export interface AnalyzeResult {
   readonly job: JobPosting;
   readonly analysis: JobAnalysis;
   readonly factsLocation: string;
+  /** Facts whose evidence no longer verifies; they were treated as stale in this run. */
+  readonly notices: readonly string[];
 }
 
-async function prepare(deps: Deps, jobText: string, factsPath: string | undefined): Promise<{ job: JobPosting; facts: FactBase; location: string; working: AnalysisWorkingSet; config: Awaited<ReturnType<typeof loadConfig>> }> {
+async function prepare(deps: Deps, jobText: string, factsPath: string | undefined): Promise<{ job: JobPosting; facts: FactBase; location: string; notices: readonly string[]; working: AnalysisWorkingSet; config: Awaited<ReturnType<typeof loadConfig>> }> {
   const job = parseJobOrThrow(jobText);
-  const handle = deps.facts(factsPath);
-  const facts = await requireFacts(handle);
+  const checked = await requireCheckedFacts(deps, deps.facts(factsPath));
   const config = await loadConfig(deps);
-  return { job, facts, location: handle.store.location, working: analyzeJob(job, facts, config), config };
+  return { job, facts: checked.base, location: checked.location, notices: checked.notices, working: analyzeJob(job, checked.base, config), config };
 }
 
 /** `analyze`: coverage matrix, risk flags, rate guidance, fit score and a recommendation for one pasted post. */
 export async function analyzeJobText(deps: Deps, input: { readonly jobText: string; readonly factsPath: string | undefined }): Promise<AnalyzeResult> {
-  const { job, location, working } = await prepare(deps, input.jobText, input.factsPath);
+  const { job, location, notices, working } = await prepare(deps, input.jobText, input.factsPath);
   const { analysis } = working;
   await storeObject(deps, job.rawText, job.digest);
   const count = (status: string): number => analysis.coverage.filter((r) => r.status === status).length;
@@ -46,7 +47,7 @@ export async function analyzeJobText(deps: Deps, input: { readonly jobText: stri
     partial: count('partial'),
     uncovered: count('uncovered'),
   });
-  return { job, analysis, factsLocation: location };
+  return { job, analysis, factsLocation: location, notices };
 }
 
 export interface DraftResult {
@@ -55,13 +56,14 @@ export interface DraftResult {
   /** Markdown with footnotes, provenance and review notes. */
   readonly audit: string;
   readonly factsLocation: string;
+  readonly notices: readonly string[];
 }
 
 /** `draft`: assembles a proposal from templates and fact claims, stores it and logs it. Nothing is sent anywhere. */
 export async function draftFromJob(deps: Deps, input: { readonly jobText: string; readonly factsPath: string | undefined; readonly tone: Tone }): Promise<DraftResult> {
-  const { job, facts, location, working, config } = await prepare(deps, input.jobText, input.factsPath);
+  const { job, facts, location, notices, working, config } = await prepare(deps, input.jobText, input.factsPath);
   const result = draftProposal({ job, working, facts, config, tone: input.tone });
-  if (!result.ok) throw new AppError('refused', 'no draft was produced', result.error);
+  if (!result.ok) throw new AppError('refused', 'no draft was produced', [...result.error, ...notices]);
   const draft = result.value;
   await storeObject(deps, job.rawText, job.digest);
   const recordDigest = await storeObject(deps, serializeStoredDraft(toStoredDraft(draft, working.analysis)));
@@ -74,7 +76,7 @@ export async function draftFromJob(deps: Deps, input: { readonly jobText: string
     tone: draft.tone,
     configVersion: draft.configVersion,
   });
-  return { draft, analysis: working.analysis, audit: renderAudit(draft, working.analysis), factsLocation: location };
+  return { draft, analysis: working.analysis, audit: renderAudit(draft, working.analysis), factsLocation: location, notices };
 }
 
 export interface CheckInput {
@@ -84,8 +86,13 @@ export interface CheckInput {
 }
 
 /** `check`: the independent gate. Works on any proposal text, whoever or whatever wrote it. */
-export async function checkProposalText(deps: Deps, input: CheckInput): Promise<CheckReport> {
-  const { job, facts, config } = await prepare(deps, input.jobText, input.factsPath);
+export interface CheckResult {
+  readonly report: CheckReport;
+  readonly notices: readonly string[];
+}
+
+export async function checkProposalText(deps: Deps, input: CheckInput): Promise<CheckResult> {
+  const { job, facts, config, notices } = await prepare(deps, input.jobText, input.factsPath);
   const report = verifyProposal({ markdown: input.markdown, job, facts, config });
   await storeObject(deps, job.rawText, job.digest);
   const draftEntry = await findDraftByText(deps, input.markdown);
@@ -98,7 +105,7 @@ export async function checkProposalText(deps: Deps, input: CheckInput): Promise<
     rules: [...new Set(report.violations.map((v) => v.rule))],
     ...(draftEntry === undefined ? {} : { draftId: draftEntry }),
   });
-  return report;
+  return { report, notices };
 }
 
 /** The id of a stored draft whose text is exactly this proposal body, so a check can be tied to its draft. */

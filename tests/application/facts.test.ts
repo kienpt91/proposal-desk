@@ -72,12 +72,34 @@ describe('addFact', () => {
 
 describe('listFacts', () => {
   it('lists assessments, and says so when there is no facts file', async () => {
-    const h = harness({ facts: FactBase.empty().add(fact()).value.add(selfDeclared({ claim: 'Ten years of TypeScript', id: 'boast' })).value });
+    const h = harness({ facts: FactBase.empty().add(fact()).value.add(selfDeclared({ claim: 'Ten years of TypeScript', id: 'boast' })).value, pin: true });
     const listed = await listFacts(h, { factsPath: undefined });
     expect(listed.assessments.map((a) => [a.fact.id, a.usable])).toEqual([['ts-services', true], ['boast', false]]);
+    expect(listed.notices).toEqual([]);
     const error = await rejection(listFacts(harness(), { factsPath: undefined }));
     expect(error).toMatchObject({ kind: 'missing' });
     expect(error.message).toContain('/memory/facts.json');
+  });
+});
+
+describe('listFacts re-checks evidence', () => {
+  it('shows a fact whose evidence changed as stale, with a notice, without writing anything', async () => {
+    const h = harness({ facts: FactBase.empty().add(fact({ evidence: { digest: sha256('proof') } })).value.add(fact({ id: 'other', claim: 'Built Go services', tags: ['go'], evidence: { reference: 'evidence/other.md', digest: sha256('other') } })).value });
+    h.evidenceFake.files.set('evidence/ts.md', 'tampered');
+    h.evidenceFake.files.set('evidence/other.md', 'other');
+    const listed = await listFacts(h, { factsPath: undefined });
+    expect(listed.assessments.map((a) => [a.fact.id, a.fact.status, a.usable])).toEqual([['ts-services', 'stale', false], ['other', 'verified', true]]);
+    expect(listed.notices).toEqual(['ts-services: evidence/ts.md no longer matches the recorded digest (treated as stale; run `facts verify` after fixing the evidence)']);
+    expect(h.factStore.base?.get('ts-services')?.status).toBe('verified');
+    expect(h.logFake.entries).toEqual([]);
+  });
+
+  it('promotes a declared fact whose checkable evidence matches, and reports a missing file', async () => {
+    const h = harness({ facts: FactBase.empty().add(fact({ status: 'declared', checkedAt: undefined, evidence: { digest: sha256('proof') } })).value.add(fact({ id: 'gone', evidence: { reference: 'evidence/gone.md' } })).value });
+    h.evidenceFake.files.set('evidence/ts.md', 'proof');
+    const listed = await listFacts(h, { factsPath: undefined });
+    expect(listed.assessments.map((a) => [a.fact.id, a.fact.status])).toEqual([['ts-services', 'verified'], ['gone', 'stale']]);
+    expect(listed.notices).toEqual(['gone: evidence/gone.md: no such file (treated as stale; run `facts verify` after fixing the evidence)']);
   });
 });
 

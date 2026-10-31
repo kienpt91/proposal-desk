@@ -215,7 +215,7 @@ describe('facts and configuration commands', () => {
     const result = await s.run(['facts', 'add', '--facts', facts, '--id', 'boast', '--claim', 'Served ten million users', '--category', 'metric', '--evidence', 'self-declared']);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('declared, self-declared, NOT usable in proposals');
-    expect(result.stdout).toContain('numbers and outcomes need evidence beyond a self-declaration');
+    expect(result.stdout).toContain('numbers and outcomes need verified evidence');
     const listed = await s.run(['facts', 'list', '--facts', facts, '--json']);
     expect(JSON.parse(listed.stdout)).toMatchObject([{ id: 'boast', usable: false, trust: 'self-declared' }]);
   });

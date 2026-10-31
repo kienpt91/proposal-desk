@@ -22,7 +22,7 @@ async function rejection(promise: Promise<unknown>): Promise<AppError> {
   throw new Error('expected a rejection');
 }
 
-async function drafted(h: Harness = harness({ facts: exampleFacts() }), tone: 'plain' | 'concise' = 'plain') {
+async function drafted(h: Harness = harness({ facts: exampleFacts(), pin: true }), tone: 'plain' | 'concise' = 'plain') {
   const result = await draftFromJob(h, { jobText: EXAMPLE_JOB, factsPath: undefined, tone });
   return { h, id: result.draft.id, draft: result.draft };
 }
@@ -214,7 +214,7 @@ describe('outcomes and insights', () => {
 
 describe('configuration proposals', () => {
   it('proposes, then applies only after a human confirms, and logs both', async () => {
-    const h = harness({ facts: exampleFacts() });
+    const h = harness({ facts: exampleFacts(), pin: true });
     expect(await showConfig(h)).toMatchObject({ isDefault: true, config: defaultConfig() });
     const proposal = await proposeConfigChange(h, { settings: [{ path: 'scoring.applyThreshold', value: '65' }], note: 'looser threshold' });
     expect(h.configFake.current).toBeUndefined();
@@ -231,7 +231,7 @@ describe('configuration proposals', () => {
   });
 
   it('does not apply when declined, stale, unknown or damaged', async () => {
-    const h = harness({ facts: exampleFacts() });
+    const h = harness({ facts: exampleFacts(), pin: true });
     const first = await proposeConfigChange(h, { settings: [{ path: 'scoring.applyThreshold', value: '65' }] });
     h.promptFake.answer = false;
     expect(await rejection(applyConfigProposal(h, { digest: first.digest }))).toMatchObject({ kind: 'refused', message: 'the proposal was not applied' });
@@ -260,7 +260,7 @@ describe('configuration proposals', () => {
   });
 
   it('rejects stored proposals that are not valid JSON or not a configuration', async () => {
-    const h = harness({ facts: exampleFacts() });
+    const h = harness({ facts: exampleFacts(), pin: true });
     const p = await proposeConfigChange(h, { settings: [{ path: 'scoring.niceWeight', value: '2' }] });
     const swap = async (content: string) => {
       const digest = await h.objectsFake.put(content);
@@ -290,7 +290,7 @@ describe('history and verify-log', () => {
   });
 
   it('summarises the remaining entry types', async () => {
-    const h = harness({ facts: exampleFacts() });
+    const h = harness({ facts: exampleFacts(), pin: true });
     const { addFact, verifyFacts } = await import('../../src/application/usecases/facts.js');
     const { analyzeJobText, checkProposalText } = await import('../../src/application/usecases/analysis.js');
     h.evidenceFake.files.set('ev.md', 'x');

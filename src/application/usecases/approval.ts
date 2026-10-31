@@ -8,7 +8,7 @@ import { proposalBody, verifyProposal, type CheckReport, type Violation } from '
 import type { LogEntry } from '../../domain/log/chain.js';
 import { sha256 } from '../../domain/shared/sha256.js';
 import { AppError } from '../errors.js';
-import { loadConfig, readVerifiedLog, record, recordAuthenticated, requireAuthentic, requireFacts, storeObject } from '../context.js';
+import { loadConfig, readVerifiedLog, record, recordAuthenticated, requireAuthentic, requireCheckedFacts, storeObject } from '../context.js';
 import { findDraft, type FoundDraft } from '../drafts.js';
 import type { Deps } from '../ports/index.js';
 import { parseJobOrThrow } from './analysis.js';
@@ -23,6 +23,8 @@ interface Context {
   readonly config: Config;
   /** Digest of the cited facts as they are now. */
   readonly currentFactsDigest: string;
+  /** Facts whose evidence no longer verifies. */
+  readonly notices: readonly string[];
 }
 
 async function load(deps: Deps, draftId: string, factsPath: string | undefined): Promise<Context> {
@@ -30,10 +32,11 @@ async function load(deps: Deps, draftId: string, factsPath: string | undefined):
   const draft = found.stored.draft;
   const job = parseJobOrThrow(found.jobText);
   if (job.digest !== draft.jobDigest) throw new AppError('io', `the stored job text of draft ${draft.id} does not match its digest`);
-  const facts = await requireFacts(deps.facts(factsPath));
+  const checked = await requireCheckedFacts(deps, deps.facts(factsPath));
+  const facts = checked.base;
   const config = await loadConfig(deps);
   const citedIds = [...new Set(draft.sentences.flatMap((s) => s.factIds))];
-  return { found, draft, job, facts, config, currentFactsDigest: facts.snapshotDigest(citedIds) };
+  return { found, draft, job, facts, config, currentFactsDigest: facts.snapshotDigest(citedIds), notices: checked.notices };
 }
 
 function bindingFor(ctx: Context, text: string): ApprovalBinding {
@@ -72,7 +75,7 @@ export async function approveDraft(deps: Deps, input: ApproveInput): Promise<App
   const ctx = await load(deps, input.draftId, input.factsPath);
   const { draft } = ctx;
   if (ctx.currentFactsDigest !== draft.factsDigest) {
-    throw new AppError('refused', `the facts cited by draft ${draft.id} changed since it was written`, ['Run `draft` again so the proposal reflects the current facts.']);
+    throw new AppError('refused', `the facts cited by draft ${draft.id} changed since it was written`, [...ctx.notices, 'Run `draft` again so the proposal reflects the current facts.']);
   }
   const editedText = input.editedMarkdown === undefined ? undefined : proposalBody(input.editedMarkdown);
   if (editedText === '') throw new AppError('invalid', 'the edited text is empty');
@@ -159,7 +162,7 @@ export async function exportDraft(
     text = editedText;
   }
   const verdict = checkApproval(stored?.approval, bindingFor(ctx, text));
-  if (!verdict.ok) throw new AppError('refused', `draft ${ctx.draft.id} cannot be exported`, [...verdict.error, 'Run `approve` again after reviewing the draft.']);
+  if (!verdict.ok) throw new AppError('refused', `draft ${ctx.draft.id} cannot be exported`, [...verdict.error, ...ctx.notices, 'Run `approve` again after reviewing the draft.']);
   refuseOnViolations(ctx.draft, verify(ctx, text), 'the approved text');
   const content = `${text}\n`;
   await deps.sink.write(input.outPath, content, { overwrite: input.overwrite });

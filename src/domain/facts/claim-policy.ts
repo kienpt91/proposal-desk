@@ -82,8 +82,8 @@ export function assessFact(fact: Fact): FactAssessment {
   const trust = trustOf(fact);
   const exclusions: string[] = [];
   if (fact.status === 'stale') exclusions.push('stale: re-verify the evidence or update the fact');
-  if (isMeasurable(fact) && fact.evidence.kind === 'self-declared') {
-    exclusions.push('numbers and outcomes need evidence beyond a self-declaration');
+  if (isMeasurable(fact) && trust !== 'verified') {
+    exclusions.push('numbers and outcomes need verified evidence: a local file the tool can re-hash (a link or a self-declaration is not enough)');
   }
   if (trust !== 'verified' && findSuperlatives(fact.claim).length > 0) {
     exclusions.push('superlatives are only allowed in verified facts');

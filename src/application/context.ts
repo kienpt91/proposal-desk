@@ -1,5 +1,6 @@
 import { configDigest, defaultConfig, type Config } from '../domain/config/config.js';
 import type { FactBase } from '../domain/facts/fact-base.js';
+import { recheckFacts, referencesToCheck, type EvidenceCheck } from '../domain/facts/recheck.js';
 import { GENESIS, nextEntry, verifyChain, type LogEntry, type LogEventType, type Payload } from '../domain/log/chain.js';
 import { signPayload, verifyEntryMac } from '../domain/log/auth.js';
 import { dayOf } from '../domain/shared/date.js';
@@ -58,6 +59,24 @@ export async function requireFacts(handle: FactsHandle): Promise<FactBase> {
     throw new AppError('missing', `no facts file at ${handle.store.location}`, ['Add facts with `facts add`, or pass --facts <path> to use another file (see examples/facts.json).']);
   }
   return base;
+}
+
+export interface CheckedFacts {
+  readonly base: FactBase;
+  readonly notices: readonly string[];
+  readonly location: string;
+}
+
+/**
+ * The facts as they are now. Every checkable evidence file is re-hashed (once per file, size-bounded by the adapter), so a fact is
+ * `verified` only if its evidence matches today; the status stored in the facts file is never trusted on its own.
+ */
+export async function requireCheckedFacts(deps: Deps, handle: FactsHandle): Promise<CheckedFacts> {
+  const base = await requireFacts(handle);
+  const checks = new Map<string, EvidenceCheck>();
+  for (const reference of referencesToCheck(base)) checks.set(reference, await handle.evidence.digestOf(reference));
+  const rechecked = recheckFacts(base, checks, today(deps));
+  return { base: rechecked.base, notices: rechecked.notices, location: handle.store.location };
 }
 
 export function today(deps: Deps): string {

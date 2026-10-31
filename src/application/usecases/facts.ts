@@ -2,7 +2,7 @@ import { assessFact, type FactAssessment } from '../../domain/facts/claim-policy
 import { FactBase, type FactEvent } from '../../domain/facts/fact-base.js';
 import { factAgeDays, isCheckable, parseFact, type AttrValue, type EvidenceKind, type Fact, type FactCategory } from '../../domain/facts/fact.js';
 import { AppError } from '../errors.js';
-import { loadConfig, record, requireFacts, today } from '../context.js';
+import { loadConfig, record, requireCheckedFacts, requireFacts, today } from '../context.js';
 import type { Deps } from '../ports/index.js';
 
 async function logEvents(deps: Deps, events: readonly FactEvent[]): Promise<void> {
@@ -76,12 +76,12 @@ export async function addFact(deps: Deps, input: AddFactInput): Promise<AddFactR
 export interface ListFactsResult {
   readonly location: string;
   readonly assessments: readonly FactAssessment[];
+  readonly notices: readonly string[];
 }
 
 export async function listFacts(deps: Deps, input: { readonly factsPath: string | undefined }): Promise<ListFactsResult> {
-  const handle = deps.facts(input.factsPath);
-  const base = await requireFacts(handle);
-  return { location: handle.store.location, assessments: base.assessments() };
+  const checked = await requireCheckedFacts(deps, deps.facts(input.factsPath));
+  return { location: checked.location, assessments: checked.base.assessments(), notices: checked.notices };
 }
 
 export type VerifyOutcome = 'verified' | 'stale' | 'skipped';
