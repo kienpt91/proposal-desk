@@ -1,0 +1,30 @@
+---proposal-desk
+proposals: 14
+client-hires: 3
+payment-verified: yes
+account-age-days: 420
+bid-min: 35
+bid-max: 70
+currency: USD
+---
+Senior TypeScript engineer for an internal logistics dashboard
+
+We are a small logistics company and we need a freelance engineer to build an internal dashboard for our dispatch team. The project is expected to take about 2-3 months at 15-20 hours per week.
+
+Requirements:
+- 4+ years of experience with TypeScript and Node.js
+- Solid knowledge of PostgreSQL and REST API design
+- Experience with React for the dashboard front end
+- Working knowledge of Redis for caching
+- Fluent written English
+
+Nice to have:
+- Docker and CI/CD experience
+- Familiarity with GraphQL
+- Experience with Kubernetes
+
+Budget: $40-$60/hr, hourly contract.
+
+Please include a link to your GitHub profile or a portfolio of similar work. Also tell us: how would you approach the first two weeks of this project?
+
+Candidates from North America or Europe preferred.

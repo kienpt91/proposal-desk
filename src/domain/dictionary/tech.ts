@@ -119,7 +119,7 @@ const ENTRIES: readonly TechEntry[] = [
   t('cicd', 'CI/CD', 'practice', 'devops', ['ci/cd', 'cicd', 'ci cd', 'continuous integration', 'continuous delivery', 'github actions', 'gitlab ci', 'jenkins', 'circleci']),
   t('linux', 'Linux', 'platform', 'devops', ['linux', 'ubuntu server', 'debian', 'sysadmin', 'system administration']),
   t('nginx', 'Nginx', 'tool', 'devops', ['nginx', 'apache httpd', 'haproxy', 'reverse proxy']),
-  t('git', 'Git', 'tool', 'tooling', ['git', 'github', 'gitlab', 'version control']),
+  t('git', 'Git', 'tool', 'tooling', ['git', 'version control']),
   // data and ml
   t('pandas', 'pandas', 'library', 'data', ['pandas', 'numpy', 'data wrangling'], { related: ['python'] }),
   t('dataengineering', 'Data engineering', 'practice', 'data', ['etl', 'elt', 'data pipeline', 'data pipelines', 'airflow', 'dbt', 'spark', 'data warehouse'], { related: ['sql', 'python'] }),
