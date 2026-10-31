@@ -1,0 +1,124 @@
+{
+  "schema": 1,
+  "facts": [
+    {
+      "id": "ts-services",
+      "claim": "Built and maintained TypeScript services on Node.js for five years",
+      "category": "skill",
+      "evidence": {
+        "kind": "file-hash",
+        "reference": "evidence/ts-services.md",
+        "digest": "9a7c232538030fbdef6740a77d656e0491ec7af7e84c646d3bf23d4b0285833e",
+        "date": "2026-05-01"
+      },
+      "status": "verified",
+      "tags": ["typescript", "node.js"],
+      "attrs": { "years": 5 },
+      "checkedAt": "2026-10-30"
+    },
+    {
+      "id": "postgres-tuning",
+      "claim": "Designed and tuned PostgreSQL schemas and indexes for a multi-tenant billing service",
+      "category": "project",
+      "evidence": {
+        "kind": "command-output",
+        "reference": "evidence/postgres-explain.txt",
+        "digest": "0159b993f6fb686ee084a00eaefc8373c524123be2f18a58c42eab2c8f69667f",
+        "date": "2026-06-10",
+        "note": "psql EXPLAIN ANALYZE on the open-invoices query"
+      },
+      "status": "verified",
+      "tags": ["postgresql"],
+      "attrs": {},
+      "checkedAt": "2026-10-30"
+    },
+    {
+      "id": "rest-openapi",
+      "claim": "Designed and documented REST APIs with OpenAPI for internal and public consumers",
+      "category": "skill",
+      "evidence": {
+        "kind": "document",
+        "reference": "evidence/openapi-summary.md",
+        "digest": "04275de412e2936173e01d2a55977759f0c0803431d1ba5b1aa190c5ca733442",
+        "date": "2026-04-15"
+      },
+      "status": "verified",
+      "tags": ["rest api", "openapi"],
+      "attrs": {},
+      "checkedAt": "2026-10-30"
+    },
+    {
+      "id": "docker-ci",
+      "claim": "Containerised services with Docker and automated builds and tests in GitHub Actions",
+      "category": "skill",
+      "evidence": {
+        "kind": "file-hash",
+        "reference": "evidence/docker-ci.md",
+        "digest": "96b98dda6f1d35aece1759ff45f9b55c0e381650cef3e3d6d01ae0485d173af0",
+        "date": "2026-05-20"
+      },
+      "status": "verified",
+      "tags": ["docker", "cicd"],
+      "attrs": {},
+      "checkedAt": "2026-10-30"
+    },
+    {
+      "id": "react-dashboard",
+      "claim": "Built a React dashboard in TypeScript for warehouse operations staff",
+      "category": "project",
+      "evidence": {
+        "kind": "repo-url",
+        "reference": "https://github.com/example/warehouse-dashboard",
+        "date": "2026-03-01"
+      },
+      "status": "declared",
+      "tags": ["react", "typescript"],
+      "attrs": {}
+    },
+    {
+      "id": "english",
+      "claim": "Professional working proficiency in English",
+      "category": "constraint",
+      "evidence": { "kind": "self-declared", "reference": "own statement", "date": "2026-05-01" },
+      "status": "declared",
+      "tags": [],
+      "attrs": { "kind": "language", "value": "English" }
+    },
+    {
+      "id": "location",
+      "claim": "Based in Vietnam",
+      "category": "constraint",
+      "evidence": { "kind": "self-declared", "reference": "own statement", "date": "2026-05-01" },
+      "status": "declared",
+      "tags": [],
+      "attrs": { "kind": "location", "value": "Vietnam" }
+    },
+    {
+      "id": "timezone",
+      "claim": "Working hours follow UTC+7",
+      "category": "constraint",
+      "evidence": { "kind": "self-declared", "reference": "own statement", "date": "2026-05-01" },
+      "status": "declared",
+      "tags": [],
+      "attrs": { "kind": "timezone", "value": "UTC+7" }
+    },
+    {
+      "id": "availability",
+      "claim": "Available 20 hours per week",
+      "category": "availability",
+      "evidence": { "kind": "self-declared", "reference": "own statement", "date": "2026-10-01" },
+      "status": "declared",
+      "tags": [],
+      "attrs": { "hoursPerWeek": 20 }
+    },
+    {
+      "id": "rate-floor",
+      "claim": "Minimum rate is 40 USD per hour",
+      "category": "rate",
+      "evidence": { "kind": "self-declared", "reference": "own statement", "date": "2026-10-01" },
+      "status": "declared",
+      "tags": [],
+      "attrs": { "floor": 40, "currency": "USD", "unit": "hour" }
+    }
+  ]
+}

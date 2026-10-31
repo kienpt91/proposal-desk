@@ -1,0 +1,2 @@
+# Evidence files are hashed byte for byte; never convert their line endings.
+examples/evidence/* -text

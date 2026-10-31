@@ -1,0 +1,7 @@
+$ psql -d billing -c "EXPLAIN ANALYZE SELECT * FROM invoices WHERE tenant_id = 42 AND status = 'open' ORDER BY due_date LIMIT 50"
+(synthetic example output)
+ Limit  (cost=0.43..18.91 rows=50 width=96) (actual time=0.041..0.212 rows=50 loops=1)
+   ->  Index Scan using invoices_tenant_status_due_idx on invoices  (cost=0.43..912.40 rows=2467 width=96) (actual time=0.040..0.205 rows=50 loops=1)
+         Index Cond: ((tenant_id = 42) AND (status = 'open'::text))
+ Planning Time: 0.180 ms
+ Execution Time: 0.241 ms
