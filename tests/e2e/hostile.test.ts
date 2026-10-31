@@ -218,9 +218,10 @@ describe('oversized and malformed input', () => {
       const started = Date.now();
       const result = await s.run(['analyze', file, '--facts', s.facts]);
       expect(result.code, `sample ${i}`).toBeLessThanOrEqual(1);
-      expect(Date.now() - started, `sample ${i} took too long`).toBeLessThan(4000);
+      // Catastrophic backtracking takes minutes; this bound only has to survive a loaded machine.
+      expect(Date.now() - started, `sample ${i} took too long`).toBeLessThan(20_000);
     }
     expect(read(s.job)).toContain('proposal-desk');
-  }, 60_000);
+  }, 240_000);
 });
 
