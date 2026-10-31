@@ -7,6 +7,7 @@ import type { JobSpec } from '../job/spec.js';
 import { findContactDetails } from '../policy/contact.js';
 import { AUTOMATION_DIRECTIVES, SCREENING_INSTRUCTIONS } from '../policy/phrases.js';
 import { splitSentences, truncate } from '../shared/text.js';
+import { scopeAround } from '../proposal/clauses.js';
 import { declaredCountry, declaredTimezone, zoneGap, type CoverageRow } from './coverage.js';
 import type { RateGuidance } from './rate.js';
 
@@ -207,7 +208,19 @@ function allSentences(body: string): string[] {
   return body.split('\n').flatMap((line) => splitSentences(line.trim().replace(/^(?:[-*•·]|\d+[.)])\s+/, '')));
 }
 
-const NEGATION_BEFORE = /\b(?:no|not|without|never|don't|do not|doesn't|does not|isn't|aren't|won't|will not|nor|neither|avoid|paid)\s+(?:\w+\s+){0,3}$/i;
+/**
+ * A negation exempts a request only when it governs that request: it stands directly before the matched words ("no free work",
+ * "do not email me", "no rush"), or it negates asking for it ("we will never ask you to share your password"), in the same clause.
+ * A negation word that merely appears nearby ("not a scam, please send your password") exempts nothing.
+ */
+const ADJACENT_NEGATOR = /\b(?:no|not|never|without|zero|don't|do not|doesn't|does not|won't|will not)\s+(?:any\s+|ever\s+|to\s+)?$/i;
+const NEGATED_REQUEST_TAIL = /\b(?:never|do\s+not|don't|does\s+not|doesn't|will\s+not|won't|would\s+not|not)\s+(?:ever\s+)?(?:ask|request|require|expect|need|want|demand)\b[^.;:!?]{0,40}$/i;
+
+function governedByNegation(text: string, index: number): boolean {
+  const scope = scopeAround(text, index);
+  const before = scope.text.slice(0, index - scope.start);
+  return ADJACENT_NEGATOR.test(before) || NEGATED_REQUEST_TAIL.test(before);
+}
 
 const GLOBAL_VARIANTS = new WeakMap<RegExp, RegExp>();
 
@@ -220,12 +233,12 @@ function globally(pattern: RegExp): RegExp {
   return re;
 }
 
-/** First sentence where `pattern` matches outside a negation ("no rush", "paid trial"). */
+/** First sentence where `pattern` matches and no negation governs the match ("no rush", "do not email me"). */
 function firstMatch(sentences: readonly string[], pattern: RegExp): string | undefined {
   const re = globally(pattern);
   for (const sentence of sentences) {
     for (const m of sentence.matchAll(re)) {
-      if (!NEGATION_BEFORE.test(sentence.slice(Math.max(0, (m.index ?? 0) - 30), m.index ?? 0))) return sentence;
+      if (!governedByNegation(sentence, m.index ?? 0)) return sentence;
     }
   }
   return undefined;
