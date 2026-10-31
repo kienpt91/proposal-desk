@@ -26,7 +26,7 @@ function summarize(entry: LogEntry): string {
     case 'proposal.checked':
       return `text ${s('textDigest').slice(0, 12)}: ${p.ok === true ? 'passed' : `${s('errors')} errors`}${p.draftId === undefined ? '' : ` (draft ${s('draftId')})`}`;
     case 'draft.approved':
-      return `${s('draftId')} approved, binding ${s('bindingDigest').slice(0, 12)}`;
+      return `${s('draftId')} approved${p.editedTextDigest === undefined ? '' : ' (edited text)'}, binding ${s('bindingDigest').slice(0, 12)}`;
     case 'draft.exported':
       return `${s('draftId')} exported, ${s('bytes')} bytes`;
     case 'outcome.recorded':
@@ -52,7 +52,7 @@ export interface LogVerification {
   readonly objectsChecked: number;
 }
 
-const OBJECT_KEYS = ['jobDigest', 'recordDigest', 'objectDigest'] as const;
+const OBJECT_KEYS = ['jobDigest', 'recordDigest', 'objectDigest', 'editedTextDigest'] as const;
 
 /** Recomputes the hash chain and checks that every stored object the log points to is present and intact. */
 export async function verifyLog(deps: Deps): Promise<LogVerification> {

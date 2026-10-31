@@ -207,12 +207,15 @@ export const COMMANDS: readonly Command[] = [
   {
     path: ['approve'],
     summary: 'record your approval of a draft (needs a terminal)',
-    description: 'Shows the draft and what it rests on, then asks you to type a confirmation token. The approval is bound to the digests of the draft text, the job text and the cited facts.',
+    description:
+      'Shows the draft and what it rests on, then asks you to type a confirmation token. The approval is bound to the digests of the text, the job text and the cited facts.\nIf you edited the draft by hand, pass the file with --text: the edited text must pass the same check and is approved instead.',
     positionals: [{ name: 'draft-id' }],
-    flags: [FACTS],
-    run: async ({ args, out, deps }) => {
-      const result = await approveDraft(deps, { draftId: args.positionals[0] as string, factsPath: flagString(args, 'facts') });
-      out.out(`Approved ${result.draft.id}. Binding ${result.approval.bindingDigest}.`);
+    flags: [{ name: 'text', kind: 'string', value: '<file|->', help: 'your edited version of the draft (Markdown); provenance and review sections are ignored' }, FACTS],
+    run: async ({ args, out, io, deps }) => {
+      const textPath = flagString(args, 'text');
+      const editedMarkdown = textPath === undefined ? undefined : await readInput(io, textPath, SIZE_LIMITS.proposalFile);
+      const result = await approveDraft(deps, { draftId: args.positionals[0] as string, factsPath: flagString(args, 'facts'), ...(editedMarkdown === undefined ? {} : { editedMarkdown }) });
+      out.out(`Approved ${result.edited ? 'your edited text of ' : ''}${result.draft.id}. Binding ${result.approval.bindingDigest}.`);
       out.out(`Next: proposal-desk export ${result.draft.id} --out final.md`);
       return 0;
     },

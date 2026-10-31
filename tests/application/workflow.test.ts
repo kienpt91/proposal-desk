@@ -113,6 +113,61 @@ describe('exportDraft', () => {
   });
 });
 
+describe('approving a hand-edited text', () => {
+  const edit = (text: string): string => text.replace('Thank you for reading.', 'Happy to start whenever suits you.');
+
+  it('binds the approval to the edited text, stores it and exports exactly it', async () => {
+    const { h, id, draft } = await drafted();
+    const edited = edit(draft.text);
+    const { approval, edited: wasEdited } = await approveDraft(h, { draftId: id, factsPath: undefined, editedMarkdown: `${edited}\n\n## Provenance\n\n[^1]: ignored` });
+    expect(wasEdited).toBe(true);
+    expect(approval.textDigest).toBe(sha256(edited));
+    expect(h.promptFake.requests[0]?.title).toBe(`Approve your edited text of draft ${id}?`);
+    expect(h.promptFake.requests[0]?.lines.join('\n')).toContain('Happy to start whenever suits you.');
+    expect(h.objectsFake.objects.get(sha256(edited))).toBe(edited);
+    expect(h.logFake.entries.at(-1)?.payload).toMatchObject({ editedTextDigest: sha256(edited), textDigest: sha256(edited) });
+    const result = await exportDraft(h, { draftId: id, factsPath: undefined, outPath: 'out.md', overwrite: false });
+    expect(h.sinkFake.files.get('out.md')).toBe(`${edited}\n`);
+    expect(result.edited).toBe(true);
+    expect((await history(h, { limit: 5, type: 'draft.approved' }))[0]?.summary).toContain('(edited text)');
+    expect((await verifyLog(h)).problems).toEqual([]);
+  });
+
+  it('refuses an edited text that fails the check, and ignores an unchanged one', async () => {
+    const { h, id, draft } = await drafted();
+    const bad = await rejection(approveDraft(h, { draftId: id, factsPath: undefined, editedMarkdown: `${draft.text}\n\nI have 12 years of Kubernetes experience.` }));
+    expect(bad).toMatchObject({ kind: 'refused' });
+    expect(bad.message).toContain('the edited text of draft');
+    expect(bad.details.join('\n')).toContain('untraceable-number');
+    expect(h.promptFake.requests).toEqual([]);
+    expect(await rejection(approveDraft(h, { draftId: id, factsPath: undefined, editedMarkdown: '## Provenance\n\nnothing' }))).toMatchObject({ kind: 'invalid', message: 'the edited text is empty' });
+    const same = await approveDraft(h, { draftId: id, factsPath: undefined, editedMarkdown: draft.text });
+    expect(same.edited).toBe(false);
+    expect(h.logFake.entries.at(-1)?.payload).not.toHaveProperty('editedTextDigest');
+  });
+
+  it('exports the latest approval: re-approving the generated text replaces an earlier edit', async () => {
+    const { h, id, draft } = await drafted();
+    await approveDraft(h, { draftId: id, factsPath: undefined, editedMarkdown: edit(draft.text) });
+    await approveDraft(h, { draftId: id, factsPath: undefined });
+    await exportDraft(h, { draftId: id, factsPath: undefined, outPath: 'out.md', overwrite: false });
+    expect(h.sinkFake.files.get('out.md')).toBe(`${draft.text}\n`);
+  });
+
+  it('refuses to export when the approved edited text went missing, or when the facts changed', async () => {
+    const { h, id, draft } = await drafted();
+    const edited = edit(draft.text);
+    await approveDraft(h, { draftId: id, factsPath: undefined, editedMarkdown: edited });
+    h.objectsFake.objects.delete(sha256(edited));
+    expect(await rejection(exportDraft(h, { draftId: id, factsPath: undefined, outPath: 'out.md', overwrite: false }))).toMatchObject({ kind: 'io' });
+    await h.objectsFake.put(edited);
+    h.factStore.base = (h.factStore.base as FactBase).markStale('rest-openapi', 'edited').value;
+    const error = await rejection(exportDraft(h, { draftId: id, factsPath: undefined, outPath: 'out.md', overwrite: false }));
+    expect(error.details.join('\n')).toContain('facts behind the draft changed after approval');
+    expect((await verifyLog(h)).problems).toEqual([]);
+  });
+});
+
 describe('outcomes and insights', () => {
   it('records outcomes with notes and bids and reports honestly about small samples', async () => {
     const { h, id } = await drafted();

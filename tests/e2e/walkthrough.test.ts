@@ -148,6 +148,29 @@ describe('walkthrough with the shipped example', () => {
     expect(blocked.code).toBe(1);
   });
 
+  it('lets you edit the draft by hand, check it, approve exactly that text and export it', async () => {
+    const s = session();
+    const draft = await s.run(['draft', s.job, '--facts', s.facts]);
+    const id = draftIdOf(draft.stderr);
+    const edited = draft.stdout.replace('Thank you for reading.', 'Happy to start whenever suits you.');
+    writeFileSync(join(s.dir, 'edited.md'), edited);
+    expect((await s.run(['check', join(s.dir, 'edited.md'), '--job', s.job, '--facts', s.facts])).code).toBe(0);
+    const approved = await s.run(['approve', id, '--text', join(s.dir, 'edited.md'), '--facts', s.facts]);
+    expect(approved.code).toBe(0);
+    expect(approved.stdout).toContain(`Approved your edited text of ${id}.`);
+    expect(s.prompt.requests.at(-1)?.lines.join('\n')).toContain('Happy to start whenever suits you.');
+    expect((await s.run(['export', id, '--out', join(s.dir, 'final.md'), '--facts', s.facts])).code).toBe(0);
+    expect(read(join(s.dir, 'final.md'))).toContain('Happy to start whenever suits you.\n');
+    expect(read(join(s.dir, 'final.md'))).not.toContain('Thank you for reading.');
+    expect((await s.run(['verify-log'])).stdout).toContain('all present and intact');
+
+    writeFileSync(join(s.dir, 'worse.md'), edited.replace('Happy to start whenever suits you.', 'I am the best.'));
+    const refused = await s.run(['approve', id, '--text', join(s.dir, 'worse.md'), '--facts', s.facts]);
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain('the edited text of draft');
+    expect((await s.run(['approve', id, '--text', join(s.dir, 'nope.md'), '--facts', s.facts])).code).toBe(1);
+  });
+
   it('does not export a draft whose approval was declined', async () => {
     const s = session();
     const id = draftIdOf((await s.run(['draft', s.job, '--facts', s.facts])).stderr);
