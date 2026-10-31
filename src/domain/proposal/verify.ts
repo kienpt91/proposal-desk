@@ -11,11 +11,12 @@ import { extractLocationRestriction, findMoney } from '../job/terms.js';
 import { toSentences } from '../job/sentences.js';
 import { findContactDetails } from '../policy/contact.js';
 import { BOILERPLATE_PHRASES, findAutomationDirective, findPhrases, findSuperlatives } from '../policy/phrases.js';
-import { hasUnsafeCharacters } from '../shared/text-safety.js';
+import { countLookalikes, foldForMatch, hasUnsafeCharacters } from '../shared/text-safety.js';
 import { contentTokens, foldText, splitSentences, truncate, wordCount } from '../shared/text.js';
 
 export type ViolationRule =
   | 'unsafe-characters'
+  | 'lookalike-characters'
   | 'too-long'
   | 'too-many-questions'
   | 'contact-details'
@@ -81,7 +82,7 @@ const CAPABILITY_CLAIM =
 const OFFER = /\b(?:rate|bid|price|fee|charge|quote|budget|cost)\b/i;
 
 function normalize(text: string): string {
-  return foldText(text).replace(/[^a-z0-9+#.\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  return foldText(foldForMatch(text)).replace(/[^a-z0-9+#.\s]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 /** Facts whose claim a sentence contains (after normalising) or mostly repeats. */
@@ -126,6 +127,9 @@ export function verifyProposal(input: { readonly markdown: string; readonly job:
   const floor = rateFloorOf(facts);
 
   if (hasUnsafeCharacters(body)) add({ rule: 'unsafe-characters', severity: 'error', excerpt: '', detail: 'The proposal contains control, bidirectional or zero-width characters.' });
+
+  const lookalikes = countLookalikes(body);
+  if (lookalikes > 0) add({ rule: 'lookalike-characters', severity: 'error', excerpt: '', detail: `${lookalikes} words mix Latin letters with look-alike letters from another script (a way to slip words past a filter).` });
 
   const words = wordCount(body);
   if (words > config.drafting.wordCap) add({ rule: 'too-long', severity: 'error', excerpt: '', detail: `${words} words; the cap is ${config.drafting.wordCap}.` });
@@ -194,7 +198,7 @@ export function verifyProposal(input: { readonly markdown: string; readonly job:
     }
 
     const covered = new Set(matchedUsable.flatMap((a) => a.techs));
-    for (const tech of techIdsIn(sentence)) {
+    for (const tech of techIdsIn(foldForMatch(sentence))) {
       if (covered.has(tech) || gap) continue;
       if (!firstPerson && jobTechs.has(tech)) continue;
       const known = usable.some((a) => a.techs.includes(tech));

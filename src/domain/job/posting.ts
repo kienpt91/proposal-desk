@@ -1,6 +1,6 @@
 import { sha256 } from '../shared/sha256.js';
 import { fail, ok, type Result } from '../shared/result.js';
-import { countUnsafeCharacters, normalizeNewlines, stripUnsafe } from '../shared/text-safety.js';
+import { countLookalikes, countUnsafeCharacters, foldForMatch, normalizeNewlines, stripUnsafe } from '../shared/text-safety.js';
 import { truncate } from '../shared/text.js';
 
 export const JOB_LIMITS = { maxChars: 60000, titleChars: 100 } as const;
@@ -38,12 +38,16 @@ export interface JobPosting {
   readonly rawText: string;
   /** The post body: metadata block removed, hidden and control characters removed. All analysis runs on this. */
   readonly body: string;
+  /** The body as keyword matchers must see it: look-alike letters mapped to Latin, marks and digits folded. Never shown as the post's text. */
+  readonly matchBody: string;
   readonly title: string;
   readonly metadata: JobMetadata;
   /** Problems with the metadata block (unknown keys, bad values). The offending lines are ignored. */
   readonly metadataIssues: readonly string[];
   /** Number of control, bidi or zero-width characters that were removed from the body. */
   readonly hiddenCharacters: number;
+  /** Words that mix Latin letters with Cyrillic or Greek look-alikes. */
+  readonly lookalikes: number;
 }
 
 const OPEN = /^---\s*proposal-desk\s*$/;
@@ -113,11 +117,11 @@ export function parseJobPosting(input: string): Result<JobPosting> {
   }
   const bodyRaw = bodyLines.join('\n');
   const hiddenCharacters = countUnsafeCharacters(bodyRaw);
-  const body = stripUnsafe(bodyRaw).trim();
+  const body = stripUnsafe(bodyRaw).normalize('NFKC').trim();
   if (body === '') return fail(['the job text has no content after the metadata block']);
   const title = truncate(
     (body.split('\n').find((line) => line.trim() !== '') as string).trim().replace(/^#{1,6}\s*/, ''),
     JOB_LIMITS.titleChars,
   );
-  return ok({ digest: sha256(rawText), rawText, body, title, metadata, metadataIssues: issues, hiddenCharacters });
+  return ok({ digest: sha256(rawText), rawText, body, matchBody: foldForMatch(body), title, metadata, metadataIssues: issues, hiddenCharacters, lookalikes: countLookalikes(body) });
 }

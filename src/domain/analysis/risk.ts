@@ -139,6 +139,13 @@ export const RISK_RULES: readonly RiskRule[] = [
     falsePositives: 'Copy and paste from web pages and chat tools sometimes leaves zero-width spaces behind.',
   },
   {
+    id: 'lookalike-characters',
+    severity: 'warn',
+    title: 'Post mixes Latin letters with look-alike letters from other scripts',
+    rationale: 'Cyrillic or Greek letters that look like Latin ones, mixed into English words (a Cyrillic "a" in "password"), are used to slip words past filters and reviewers. The tool matches the post with look-alikes mapped back to Latin letters, so the hidden request is still flagged.',
+    falsePositives: 'Names and quotations in another script next to English text. Words written entirely in one script are not counted.',
+  },
+  {
     id: 'automation-directives',
     severity: 'warn',
     title: 'Post contains text addressed to an automated reader',
@@ -336,6 +343,8 @@ const DETECTORS: Readonly<Record<string, Detector>> = {
   },
   'hidden-characters': ({ job }) =>
     job.hiddenCharacters > 0 ? [flag('hidden-characters', `${job.hiddenCharacters} hidden or control characters were removed before analysis.`)] : [],
+  'lookalike-characters': ({ job }) =>
+    job.lookalikes > 0 ? [flag('lookalike-characters', `${job.lookalikes} words mix Latin letters with look-alike letters from another script; they were matched as the Latin letters they imitate.`)] : [],
   'automation-directives': (_ctx, sentences) => {
     for (const pattern of AUTOMATION_DIRECTIVES) {
       const hit = sentences.find((s) => pattern.test(s));
@@ -368,7 +377,7 @@ const SEVERITY_ORDER: Readonly<Record<Severity, number>> = { hard: 0, warn: 1, i
 
 /** Runs every rule. Flags never block anything by themselves: they are listed in the report, hard ones first. */
 export function detectRisks(ctx: RiskContext): RiskFlag[] {
-  const sentences = allSentences(ctx.job.body);
+  const sentences = allSentences(ctx.job.matchBody);
   const flags = RISK_RULES.flatMap((rule) => (DETECTORS[rule.id] as Detector)(ctx, sentences));
   return flags
     .map((f, i) => ({ f, i }))

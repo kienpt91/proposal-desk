@@ -1,3 +1,5 @@
+import { foldForMatch } from '../shared/text-safety.js';
+
 // Phrase lists behind the "no boilerplate, no exaggeration" rules. Matching is case-insensitive
 // on word boundaries. The lists are data: extend them here, tests keep them well-formed.
 
@@ -104,13 +106,15 @@ function patternFor(phrase: string): RegExp {
 
 /** Returns the phrases from `list` found in `text` (each at most once), in list order. */
 export function findPhrases(text: string, list: readonly string[]): string[] {
-  return list.filter((phrase) => patternFor(phrase).test(text));
+  const folded = foldForMatch(text);
+  return list.filter((phrase) => patternFor(phrase).test(folded));
 }
 
 /** Returns the excerpt of the first automation directive found, or undefined. */
 export function findAutomationDirective(text: string): string | undefined {
+  const folded = foldForMatch(text);
   for (const pattern of AUTOMATION_DIRECTIVES) {
-    const m = pattern.exec(text);
+    const m = pattern.exec(folded);
     if (m !== null) return m[0];
   }
   return undefined;
@@ -118,5 +122,5 @@ export function findAutomationDirective(text: string): string | undefined {
 
 /** Superlatives in `text`; the compounds "best practice(s)" and "best effort" are ordinary engineering terms. */
 export function findSuperlatives(text: string): string[] {
-  return findPhrases(text.replace(/\bbest[ -](?:practices?|effort)\b/gi, ' '), SUPERLATIVE_TERMS);
+  return findPhrases(foldForMatch(text).replace(/\bbest[ -](?:practices?|effort)\b/gi, ' '), SUPERLATIVE_TERMS);
 }

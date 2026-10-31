@@ -112,6 +112,13 @@ fires although the post is fine. Severity penalties and thresholds are in the co
 - Why: Zero-width, bidirectional and control characters can hide text from a reader or reorder what you see. They were removed before analysis.
 - False positives: Copy and paste from web pages and chat tools sometimes leaves zero-width spaces behind.
 
+## `lookalike-characters`
+
+**Post mixes Latin letters with look-alike letters from other scripts** (Warning)
+
+- Why: Cyrillic or Greek letters that look like Latin ones, mixed into English words (a Cyrillic "a" in "password"), are used to slip words past filters and reviewers. The tool matches the post with look-alikes mapped back to Latin letters, so the hidden request is still flagged.
+- False positives: Names and quotations in another script next to English text. Words written entirely in one script are not counted.
+
 ## `automation-directives`
 
 **Post contains text addressed to an automated reader** (Warning)

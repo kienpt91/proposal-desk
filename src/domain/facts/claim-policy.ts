@@ -1,5 +1,6 @@
 import { findTechs, techIdsIn } from '../dictionary/tech.js';
 import { findSuperlatives } from '../policy/phrases.js';
+import { foldForMatch } from '../shared/text-safety.js';
 import { tagTechIds, type Fact } from './fact.js';
 
 /**
@@ -18,25 +19,35 @@ export function trustOf(fact: Fact): Trust {
 const WORD_NUMBERS: Readonly<Record<string, number>> = {
   zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
   eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18,
-  nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, hundred: 100, thousand: 1000, million: 1000000,
-  dozen: 12, dozens: 12, hundreds: 100, thousands: 1000,
+  nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+  hundred: 100, thousand: 1000, million: 1_000_000, billion: 1_000_000_000, trillion: 1_000_000_000_000,
+  dozen: 12, dozens: 12, hundreds: 100, thousands: 1000, millions: 1_000_000, billions: 1_000_000_000,
+  decade: 10, decades: 10, twice: 2, thrice: 3, double: 2, doubled: 2, triple: 3, tripled: 3, quadruple: 4, quadrupled: 4,
 };
 const WORD_PATTERN = Object.keys(WORD_NUMBERS).join('|');
+const TENS = 'twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety';
+const UNITS = 'one|two|three|four|five|six|seven|eight|nine';
+const COMPOUND = new RegExp(`\\b(${TENS})[- ](${UNITS})\\b`, 'gi');
+/** Digits are numbers wherever they sit (also glued to units: 3x, 10yrs, 90ms), except inside names (vue3, es6, h264, v1.2.3) and after ordinals. */
 const NUMBER_TOKEN = new RegExp(
-  `(?<![A-Za-z0-9.#+/-])(\\d{1,3}(?:,\\d{3})+|\\d+(?:\\.\\d+)?)\\s?(k|m|%)?(?![A-Za-z0-9])|\\b(${WORD_PATTERN})\\b`,
+  `(?<![A-Za-z_#+.\\d])(\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?)(?!(?:st|nd|rd|th)\\b)(?:\\s?(k|m|bn|b|%)(?![A-Za-z]))?|\\b(${WORD_PATTERN})\\b(?![-\\w])`,
   'gi',
 );
 
 /**
- * Numbers mentioned in `text`, normalised ("1,200" and "1200" agree, "five" and "5" agree, "10k" is 10000).
- * Digits that belong to a technology name ("Vue 3", "Java 17") are not numbers.
+ * Numbers mentioned in `text`, normalised ("1,200" and "1200" agree, "five" and "5" agree, "10k" is 10000, "３" is 3,
+ * "twenty-five" is 25, "twice" is 2). Digits that belong to a technology name ("Vue 3", "Java 17") are not numbers.
  */
 export function extractNumbers(text: string): string[] {
-  let scrubbed = text;
-  for (const match of [...findTechs(text)].sort((a, b) => b.index - a.index)) {
+  let scrubbed = foldForMatch(text).replace(/\b(\d{4})-\d{2}(?:-\d{2})?\b/g, '$1');
+  for (const match of [...findTechs(scrubbed)].sort((a, b) => b.index - a.index)) {
     scrubbed = `${scrubbed.slice(0, match.index)}${' '.repeat(match.length)}${scrubbed.slice(match.index + match.length)}`;
   }
   const out: string[] = [];
+  scrubbed = scrubbed.replace(COMPOUND, (_all: string, tens: string, unit: string) => {
+    out.push(String((WORD_NUMBERS[tens.toLowerCase()] as number) + (WORD_NUMBERS[unit.toLowerCase()] as number)));
+    return ' ';
+  });
   for (const m of scrubbed.matchAll(NUMBER_TOKEN)) {
     if (m[3] !== undefined) {
       out.push(String(WORD_NUMBERS[m[3].toLowerCase()]));
@@ -46,6 +57,7 @@ export function extractNumbers(text: string): string[] {
     const suffix = m[2]?.toLowerCase();
     if (suffix === 'k') value *= 1000;
     if (suffix === 'm') value *= 1_000_000;
+    if (suffix === 'b' || suffix === 'bn') value *= 1_000_000_000;
     out.push(String(value));
   }
   return out;

@@ -1,22 +1,17 @@
-// Everything the tool prints or stores is escaped here. Job posts are untrusted input:
-// they may carry ANSI/OSC escape sequences, bidi overrides or zero-width characters meant
-// to confuse a terminal, a reviewer or a keyword matcher.
+// Everything the tool prints or stores is escaped here. Job posts and proposals are untrusted input:
+// they may carry ANSI/OSC escape sequences, bidi overrides, zero-width or other invisible characters
+// meant to confuse a terminal, a reviewer or a keyword matcher, and look-alike letters (Cyrillic,
+// Greek, fullwidth forms) meant to slip a banned word past a filter.
 
-/** Code points that are never printed raw: C0/C1 controls (except \n and \t), DEL, bidi controls,
- *  zero-width and invisible formatting characters, line/paragraph separators, BOM, specials. */
+/** Code points that are never printed raw: controls, every default-ignorable and format character, private use,
+ *  line/paragraph separators, the blank braille pattern, specials. Newline and tab are kept unless asked otherwise. */
+const UNSAFE_NON_ASCII = /[\p{Default_Ignorable_Code_Point}\p{Cc}\p{Cf}\p{Co}\p{Cs}\p{Zl}\p{Zp}\u2800\ufff9-\ufffc]/u;
+
 export function isUnsafeCodePoint(cp: number, keepNewlines = true): boolean {
   if (cp === 0x0a || cp === 0x09) return !keepNewlines && cp === 0x0a;
   if (cp < 0x20 || cp === 0x7f) return true;
-  if (cp >= 0x80 && cp <= 0x9f) return true; // C1 controls, includes the 8-bit CSI (0x9b) and OSC (0x9d)
-  if (cp === 0x061c || cp === 0x180e) return true;
-  if (cp >= 0x200b && cp <= 0x200f) return true; // zero-width space/joiners, LRM, RLM
-  if (cp >= 0x2028 && cp <= 0x202e) return true; // line/paragraph separators, bidi embeddings and overrides
-  if (cp >= 0x2060 && cp <= 0x206f) return true; // word joiner, invisible operators, bidi isolates, deprecated formatting
-  if (cp === 0xfeff) return true; // BOM / zero width no-break space
-  if (cp >= 0xfff9 && cp <= 0xfffc) return true; // interlinear annotation, object replacement
-  if (cp >= 0xe0000 && cp <= 0xe007f) return true; // tag characters
-  if (cp >= 0xd800 && cp <= 0xdfff) return true; // lone surrogates (never reached for well-formed text)
-  return false;
+  if (cp < 0xa0) return cp >= 0x80; // C1 controls, includes the 8-bit CSI (0x9b) and OSC (0x9d)
+  return UNSAFE_NON_ASCII.test(String.fromCodePoint(cp));
 }
 
 /** True when `text` contains at least one code point that `escapeUnsafe` would rewrite. */
@@ -42,8 +37,8 @@ export function escapeUnsafe(text: string): string {
   return out;
 }
 
-/** Removes unsafe code points, keeping layout. Used before keyword matching so hidden characters
- *  cannot split a phrase; the count is reported separately as a risk flag. */
+/** Removes unsafe code points, keeping layout. Used before analysis so hidden characters cannot split a phrase;
+ *  the count is reported separately as a risk flag. */
 export function stripUnsafe(text: string): string {
   let out = '';
   for (const ch of text) if (!isUnsafeCodePoint(ch.codePointAt(0) as number)) out += ch;
@@ -70,4 +65,66 @@ export function escapeUnsafeForJson(serialized: string): string {
 /** CRLF/CR to LF; nothing else is changed. */
 export function normalizeNewlines(text: string): string {
   return text.replace(/\r\n?/g, '\n');
+}
+
+// ------------------------------------------------------------------ folding for matching
+
+/** Cyrillic and Greek letters that are, in common fonts, indistinguishable from Latin ones. */
+const CONFUSABLES: ReadonlyMap<string, string> = new Map(
+  Object.entries({
+    // Cyrillic, lower case
+    а: 'a', е: 'e', о: 'o', р: 'p', с: 'c', х: 'x', у: 'y', і: 'i', ј: 'j', ѕ: 's', һ: 'h', ԁ: 'd', ԛ: 'q', ԝ: 'w', ӏ: 'l', к: 'k', м: 'm', н: 'h', т: 't', в: 'b', г: 'r',
+    // Cyrillic, upper case
+    А: 'A', В: 'B', С: 'C', Е: 'E', Н: 'H', І: 'I', Ј: 'J', К: 'K', М: 'M', О: 'O', Р: 'P', Ѕ: 'S', Т: 'T', Х: 'X', У: 'Y',
+    // Greek, lower case
+    α: 'a', ε: 'e', ι: 'i', κ: 'k', ο: 'o', ρ: 'p', τ: 't', υ: 'u', ν: 'v', χ: 'x', ω: 'w',
+    // Greek, upper case
+    Α: 'A', Β: 'B', Ε: 'E', Ζ: 'Z', Η: 'H', Ι: 'I', Κ: 'K', Μ: 'M', Ν: 'N', Ο: 'O', Ρ: 'P', Τ: 'T', Υ: 'Y', Χ: 'X',
+  }),
+);
+
+const DECIMAL = /\p{Nd}/u;
+const MARK = /\p{M}/u;
+
+/** The value 0-9 of a decimal digit from any script. */
+function decimalValue(cp: number): number {
+  let start = cp;
+  while (start > 0 && DECIMAL.test(String.fromCodePoint(start - 1))) start--;
+  return (cp - start) % 10;
+}
+
+/**
+ * The text as a keyword, contact or number matcher should see it: invisible characters removed, compatibility forms
+ * (fullwidth, ligatures, circled and mathematical letters) decomposed, combining marks removed, decimal digits of
+ * any script turned into ASCII digits, and Cyrillic/Greek look-alikes mapped to the Latin letters they imitate.
+ * Case and newlines are kept. It is for matching only; never show it as the author's text.
+ */
+export function foldForMatch(text: string): string {
+  let out = '';
+  for (const ch of text.normalize('NFKD')) {
+    const cp = ch.codePointAt(0) as number;
+    if (cp < 0x80) {
+      if (!isUnsafeCodePoint(cp)) out += ch;
+      continue;
+    }
+    if (isUnsafeCodePoint(cp) || MARK.test(ch)) continue;
+    if (DECIMAL.test(ch)) out += String(decimalValue(cp));
+    else out += CONFUSABLES.get(ch) ?? ch;
+  }
+  return out;
+}
+
+/** Number of words that mix Latin letters with Cyrillic or Greek look-alikes: the signature of a filter-evasion attempt. */
+export function countLookalikes(text: string): number {
+  let count = 0;
+  for (const token of text.split(/[^\p{L}\p{N}]+/u)) {
+    if (token === '' || !/[A-Za-z]/.test(token)) continue;
+    for (const ch of token) {
+      if (CONFUSABLES.has(ch)) {
+        count++;
+        break;
+      }
+    }
+  }
+  return count;
 }
