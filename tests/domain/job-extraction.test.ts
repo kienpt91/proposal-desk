@@ -148,6 +148,7 @@ describe('budget, duration and restrictions', () => {
   it('parses durations', () => {
     expect(of('Estimated duration: six weeks').duration).toMatchObject({ minDays: 42, maxDays: 42 });
     expect(of('Needs to be completed within 10 days').duration).toMatchObject({ maxDays: 10 });
+    expect(of('Must be done in 5 days.').duration).toMatchObject({ maxDays: 5 });
     expect(of('We have 3 weeks of coffee').duration).toBeUndefined();
   });
 
@@ -165,6 +166,10 @@ describe('budget, duration and restrictions', () => {
     expect(of('We need 4 hours overlap with EST.').timezone).toMatchObject({ offset: -5, label: 'EST' });
     expect(of('Working hours: UTC+1 to UTC+2, daily standup.').timezone).toMatchObject({ offset: 1 });
     expect(of('Must be available during US business hours for meetings.').timezone).toMatchObject({ offset: -6 });
+    expect(of('Overlap with Pacific time is important.').timezone).toMatchObject({ offset: -8 });
+    expect(of('We work eastern hours for standup.').timezone).toMatchObject({ offset: -5 });
+    expect(of('Available during mountain time meetings.').timezone).toMatchObject({ offset: -7 });
+    expect(of('Core hours in central time (US) for calls.').timezone).toMatchObject({ offset: -6 });
     expect(of('A pleasant remote team.').timezone).toBeUndefined();
   });
 

@@ -56,6 +56,9 @@ describe('technology dictionary', () => {
     expect(techIdsIn('java.util imports')).toEqual([]);
     expect(techIdsIn('We want Go developers; lets go to market. Go ahead.')).toEqual(['go']);
     expect(techIdsIn('please go ahead')).toEqual([]);
+    expect(techIdsIn('Strong knowledge of Go and PostgreSQL')).toEqual(['go', 'postgresql']);
+    expect(techIdsIn('Backend Engineer (Go / Kubernetes)')).toEqual(['go', 'kubernetes']);
+    expect(techIdsIn('Time to Go to market; let us Go for lunch')).toEqual([]);
     expect(techIdsIn('Rust developer wanted; rust on cars')).toEqual(['rust']);
     expect(findTechs('Express.js and node.js.')[1]).toMatchObject({ id: 'nodejs', text: 'node.js' });
   });

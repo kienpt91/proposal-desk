@@ -249,7 +249,8 @@ const OFF_PLATFORM = [
 ];
 const URGENCY = /\b(?:asap|urgent(?:ly)?|immediately|right now|as soon as possible|within (?:24|48) hours|by tomorrow|start (?:today|now|immediately|right away)|(?:needed|need it|need this) (?:today|tonight|now)|deadline (?:is )?(?:tomorrow|today|tonight)|rush)\b/i;
 const CLONE = /\b(?:like|similar to|clone of|copy of)\s+(?:uber|airbnb|facebook|instagram|tiktok|netflix|amazon|whatsapp|tinder|twitter|youtube|spotify|shopify|binance)\b/i;
-const NON_STACK_FAMILIES = new Set(['api', 'architecture', 'process', 'testing', 'security', 'performance', 'tooling']);
+// Generic engineering families that almost every project touches; only specialisations count towards "unrelated families".
+const NON_STACK_FAMILIES = new Set(['api', 'architecture', 'process', 'testing', 'security', 'performance', 'tooling', 'database', 'cloud', 'devops', 'payments']);
 
 type Detector = (ctx: RiskContext, sentences: readonly string[]) => RiskFlag[];
 

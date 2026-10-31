@@ -115,6 +115,7 @@ describe('risk rules', () => {
     expect(has('Requirements:\n- React\n- Node.js\n- PostgreSQL\n- Docker\n- Redis\nExpected duration: 5 days.', 'unrealistic-scope')).toBe(true);
     expect(has('We want an app like Uber built by one person.', 'unrealistic-scope')).toBe(true);
     expect(has('Requirements:\n- React\n- Node.js\n- PostgreSQL', 'unrealistic-scope')).toBe(false);
+    expect(has('Requirements:\n- Python\n- Django\n- PostgreSQL\n- AWS\n- Docker\n- Airflow', 'unrealistic-scope')).toBe(false);
   });
 
   it('flags budgets against the floor and the scope', () => {

@@ -89,7 +89,7 @@ export interface Duration {
 
 const WORD_NUMBER: Readonly<Record<string, number>> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12 };
 const DURATION = /\b(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|twelve)(?:\s*(?:-|–|to)\s*(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|twelve))?\s*\+?\s*(days?|weeks?|months?)\b/i;
-const DURATION_CONTEXT = /\b(?:duration|timeline|deadline|within|next|over|lasting|long|complete|completed|deliver|delivered|estimated|expected|term|contract|project length|ready|launch)\b/i;
+const DURATION_CONTEXT = /\b(?:duration|timeline|deadline|within|next|over|lasting|long|complete|completed|deliver|delivered|done|finish|finished|estimated|expected|term|contract|project length|ready|launch)\b/i;
 
 function numberOf(token: string): number {
   return WORD_NUMBER[token.toLowerCase()] ?? Number(token);
@@ -203,6 +203,10 @@ export interface TimezoneRequirement {
 
 const ZONE_WORDS: readonly (readonly [RegExp, number, string])[] = [
   [/\bus (?:time ?zones?|hours|business hours|working hours)\b/i, -6, 'US hours'],
+  [/\bpacific(?: standard| daylight)? (?:time|hours|time ?zone)\b/i, -8, 'Pacific time'],
+  [/\beastern(?: standard| daylight)? (?:time|hours|time ?zone)\b/i, -5, 'Eastern time'],
+  [/\bcentral (?:standard |daylight )?(?:time|hours) \(?(?:us|usa|america)\b|\bcentral time\b/i, -6, 'Central time'],
+  [/\bmountain(?: standard| daylight)? (?:time|hours|time ?zone)\b/i, -7, 'Mountain time'],
   [/\b(?:european|eu|europe) (?:time ?zones?|hours|business hours|working hours)\b/i, 1, 'European hours'],
   [/\b(?:australian|aus|australia) (?:time ?zones?|hours|business hours)\b/i, 10, 'Australian hours'],
   [/\b(?:uk|british) (?:time ?zones?|hours|business hours)\b/i, 0, 'UK hours'],

@@ -91,22 +91,22 @@ export function guideRate(job: JobPosting, spec: JobSpec, base: FactBase, config
       const estimatedHours = config.risk.hoursPerMustHave * musts;
       const minimum = round(estimatedHours * floor.amount);
       const hoursCovered = Math.floor(effective.max / floor.amount);
-      reasoning.push(`Estimated scope: ${config.risk.hoursPerMustHave} hours x ${musts} must-have technologies = ${estimatedHours} hours; at your floor that is ${minimum} ${floor.currency}. The effective covers ${hoursCovered} hours at your floor.`);
+      reasoning.push(`Estimated scope: ${config.risk.hoursPerMustHave} hours x ${musts} must-have technologies = ${estimatedHours} hours; at your floor that is ${minimum} ${floor.currency}. The budget covers ${hoursCovered} hours at your floor.`);
       if (effective.max < minimum) {
-        return { verdict: 'below-floor', floor, suggestion: { amount: minimum, currency: floor.currency, unit: 'project' }, belowFloor: false, lowBudget: true, hoursCovered, reasoning: [...reasoning, `The effective ${effective.max} is below the ${minimum} your floor implies for this scope.`] };
+        return { verdict: 'below-floor', floor, suggestion: { amount: minimum, currency: floor.currency, unit: 'project' }, belowFloor: false, lowBudget: true, hoursCovered, reasoning: [...reasoning, `The budget ${effective.max} is below the ${minimum} your floor implies for this scope.`] };
       }
       const target = round(Math.max(minimum, Math.min(midpoint as number, effective.max)));
-      reasoning.push(`Suggested bid = max(scope minimum ${minimum}, min(midpoint ${midpoint}, effective maximum ${effective.max})) = ${target}.`);
+      reasoning.push(`Suggested bid = max(scope minimum ${minimum}, min(midpoint ${midpoint}, budget maximum ${effective.max})) = ${target}.`);
       return { verdict: 'ok', floor, suggestion: { amount: target, currency: floor.currency, unit: 'project' }, belowFloor: false, lowBudget: false, hoursCovered, reasoning };
     }
     if (effective.max < floor.amount) {
-      reasoning.push(`The effective ${effective.max} is below your project floor ${floor.amount}.`);
+      reasoning.push(`The budget ${effective.max} is below your project floor ${floor.amount}.`);
       return { verdict: 'below-floor', floor, suggestion: { amount: floor.amount, currency: floor.currency, unit: 'project' }, belowFloor: true, lowBudget: false, hoursCovered: undefined, reasoning };
     }
     const target = round(Math.max(floor.amount, Math.min(midpoint as number, effective.max)));
-    reasoning.push(`Suggested bid = max(floor ${floor.amount}, min(midpoint ${midpoint}, effective maximum ${effective.max})) = ${target}.`);
+    reasoning.push(`Suggested bid = max(floor ${floor.amount}, min(midpoint ${midpoint}, budget maximum ${effective.max})) = ${target}.`);
     return { verdict: 'ok', floor, suggestion: { amount: target, currency: floor.currency, unit: 'project' }, belowFloor: false, lowBudget: false, hoursCovered: undefined, reasoning };
   }
 
-  return none('unsupported', `The pay type (${effective?.type ?? 'bid range only'}) does not match your floor unit (${floor.unit}): quote at or above your floor yourself.`);
+  return none('unsupported', `The pay type (${effective?.type ?? 'unknown'}) does not match your floor unit (${floor.unit}): quote at or above your floor yourself.`);
 }

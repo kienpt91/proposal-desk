@@ -58,7 +58,11 @@ const ENTRIES: readonly TechEntry[] = [
   t('cpp', 'C++', 'language', 'systems', ['c++', 'cpp', 'modern c++']),
   t('c', 'C', 'language', 'systems', ['c programming', 'c language', 'embedded c'], { related: ['cpp'] }),
   t('go', 'Go', 'language', 'go', ['golang', 'go lang'], {
-    patterns: ['\\bGo\\b(?=\\s+(?:developer|engineer|programmer|backend|services|microservices|language))'],
+    patterns: [
+      '\\bGo\\b(?=\\s+(?:developer|engineer|programmer|backend|services|microservices|language))',
+      '(?<=\\b(?:in|with|using|of|and|or|via)\\s)Go\\b(?!\\s+(?:to|for|ahead|live|home|back|on|through|beyond|get))',
+      '(?<=[(/,]\\s?)Go(?=\\s*[/,)])',
+    ],
   }),
   t('rust', 'Rust', 'language', 'rust', ['rust lang', 'rustlang'], { patterns: ['\\bRust\\b(?!\\s+(?:belt|bucket|proof|remover))'] }),
   t('php', 'PHP', 'language', 'php', ['php', 'php8'], { related: ['laravel'] }),

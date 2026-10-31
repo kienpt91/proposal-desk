@@ -51,12 +51,16 @@ describe('rate guidance', () => {
     expect(ok.reasoning.join('\n')).toContain('5 hours x 2 must-have technologies = 10 hours');
     const low = rate(`${musts}Fixed price $200.`);
     expect(low).toMatchObject({ verdict: 'below-floor', lowBudget: true, hoursCovered: 5, suggestion: { amount: 400 } });
+    expect(low.reasoning.join(' ')).toContain('The budget covers 5 hours at your floor.');
+    expect(low.reasoning.at(-1)).toBe('The budget 200 is below the 400 your floor implies for this scope.');
     expect(rate('Requirements:\n- TypeScript\nFixed price $5,000.').suggestion?.amount).toBe(5000);
   });
 
   it('handles project floors', () => {
     const facts = factBase(rateFact(1000, 'USD', 'project'));
-    expect(rate('TypeScript work. Fixed price $800.', facts)).toMatchObject({ verdict: 'below-floor', belowFloor: true, suggestion: { amount: 1000, unit: 'project' } });
+    const below = rate('TypeScript work. Fixed price $800.', facts);
+    expect(below).toMatchObject({ verdict: 'below-floor', belowFloor: true, suggestion: { amount: 1000, unit: 'project' } });
+    expect(below.reasoning.at(-1)).toBe('The budget 800 is below your project floor 1000.');
     expect(rate('TypeScript work. Fixed price $3000.', facts)).toMatchObject({ verdict: 'ok', suggestion: { amount: 3000, unit: 'project' } });
     expect(rate('TypeScript work. Budget: $30-$60/hr.', facts)).toMatchObject({ verdict: 'unsupported', suggestion: undefined });
   });
