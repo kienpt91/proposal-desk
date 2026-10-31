@@ -175,11 +175,11 @@ Add `--json` for the same data as JSON. Use `-` instead of a file name to read t
 ```
 $ proposal-desk draft examples/job-post.txt --facts examples/facts.json > draft.md
 
-Draft d-de5d3b768290: 94 of 200 words, tone plain, 5 cited facts.
+Draft d-709a3891c3f9: 94 of 200 words, tone plain, 5 cited facts.
 Nothing was sent. Review it, then:
   proposal-desk check <file> --job <job>              verify an edited version
-  proposal-desk approve d-de5d3b768290                record your approval (needs a terminal)
-  proposal-desk export d-de5d3b768290 --out final.md  write the approved text
+  proposal-desk approve d-709a3891c3f9                record your approval (needs a terminal)
+  proposal-desk export d-709a3891c3f9 --out final.md  write the approved text
 $ cat draft.md
 Hello, your post asks for TypeScript, Node.js and PostgreSQL.
 
@@ -282,8 +282,8 @@ $ echo $?
 Export refuses until a human has approved exactly this draft:
 
 ```
-$ proposal-desk export d-de5d3b768290 --out final.md --facts examples/facts.json
-proposal-desk: draft d-de5d3b768290 cannot be exported
+$ proposal-desk export d-709a3891c3f9 --out final.md --facts examples/facts.json
+proposal-desk: draft d-709a3891c3f9 cannot be exported
   this draft has not been approved
   Run `approve` again after reviewing the draft.
 ```
@@ -293,20 +293,20 @@ depends on the digests of the text, the job and the cited facts. (Elided below: 
 notes, which are printed as above.)
 
 ```
-$ proposal-desk approve d-de5d3b768290 --facts examples/facts.json
-Approve draft d-de5d3b768290?
+$ proposal-desk approve d-709a3891c3f9 --facts examples/facts.json
+Approve draft d-709a3891c3f9?
 
 Nothing is sent anywhere. Approval only allows `export` to write the final text to a file.
 
 [... the draft text and review notes, printed as in step 3 ...]
 
-text e3d9d040446b  job adab1f0802a0  facts c65f8e4bb2e9
+text e3d9d040446b  job adab1f0802a0  facts 1571b3552947
 
-Type "approve bf18f1e2" to confirm, anything else cancels: approve bf18f1e2
+Type "approve 1dfedef5" to confirm, anything else cancels: approve 1dfedef5
 
-Approved d-de5d3b768290. Binding bf18f1e2ad69c0ce37d2d6a113549e28858a41f56028eb23237bddfedfa066d6.
-Next: proposal-desk export d-de5d3b768290 --out final.md
-$ proposal-desk export d-de5d3b768290 --out final.md --facts examples/facts.json
+Approved d-709a3891c3f9. Binding 1dfedef5eb2f716a8e538c06a094373e43ee5da4cc8e85800a8a66a1d1ed51d4.
+Next: proposal-desk export d-709a3891c3f9 --out final.md
+$ proposal-desk export d-709a3891c3f9 --out final.md --facts examples/facts.json
 Wrote 579 bytes to final.md. Review it once more and send it yourself.
 $ cat final.md
 Hello, your post asks for TypeScript, Node.js and PostgreSQL.
@@ -329,19 +329,20 @@ Thank you for reading.
 Without a terminal the same command refuses, so a script cannot approve for you:
 
 ```
-$ proposal-desk approve d-de5d3b768290 --facts examples/facts.json < /dev/null
+$ proposal-desk approve d-709a3891c3f9 --facts examples/facts.json < /dev/null
 proposal-desk: this step needs a person at an interactive terminal
   Run the command directly in a terminal; it cannot be scripted or piped.
 ```
 
-If you edit the draft file, change a cited fact or its evidence, or use another job text after approving,
-`export` refuses again.
+Edited the draft by hand? Check it, then approve that exact text with `approve <draft-id> --text edited.md`:
+the edited text must pass the same check, the approval is bound to *its* digest, and `export` writes it. If the
+text, the job text or a cited fact (or its evidence) changes after approval, `export` refuses again.
 
 ### 6. Record the outcome and look at the statistics
 
 ```
-$ proposal-desk outcome record d-de5d3b768290 replied --note "asked for a call" --bid 53
-Recorded replied for d-de5d3b768290.
+$ proposal-desk outcome record d-709a3891c3f9 replied --note "asked for a call" --bid 53
+Recorded replied for d-709a3891c3f9.
 $ proposal-desk insights
 Drafts: 1   with an outcome: 1   pending: 0
 Overall reply rate: 100% (1 of 1)  [small sample]
@@ -389,25 +390,25 @@ Nothing changed. To adopt it: proposal-desk config apply 3dd2778e0e4f
 
 ```
 $ proposal-desk history
-1     2026-10-31T09:10:19.440Z  fact.verified     ts-services re-checked on 2026-10-31
-2     2026-10-31T09:10:19.442Z  fact.verified     postgres-tuning re-checked on 2026-10-31
-3     2026-10-31T09:10:19.443Z  fact.verified     rest-openapi re-checked on 2026-10-31
-4     2026-10-31T09:10:19.445Z  fact.verified     docker-ci re-checked on 2026-10-31
-5     2026-10-31T09:10:19.529Z  job.analyzed      job adab1f0802a0: fit 80.9, apply-with-caveats
-6     2026-10-31T09:10:19.633Z  draft.generated   d-de5d3b768290 (plain) for job adab1f0802a0
-7     2026-10-31T09:10:19.737Z  proposal.checked  text e3d9d040446b: passed (draft d-de5d3b768290)
-8     2026-10-31T09:10:19.836Z  proposal.checked  text 99ea54621112: 8 errors
-9     2026-10-31T09:10:22.953Z  draft.approved    d-de5d3b768290 approved, binding bf18f1e2ad69
-10    2026-10-31T09:10:24.067Z  draft.exported    d-de5d3b768290 exported, 579 bytes
-11    2026-10-31T09:10:24.121Z  outcome.recorded  d-de5d3b768290: replied - asked for a call
+1     2026-10-31T09:15:13.847Z  fact.verified     ts-services re-checked on 2026-10-31
+2     2026-10-31T09:15:13.849Z  fact.verified     postgres-tuning re-checked on 2026-10-31
+3     2026-10-31T09:15:13.851Z  fact.verified     rest-openapi re-checked on 2026-10-31
+4     2026-10-31T09:15:13.852Z  fact.verified     docker-ci re-checked on 2026-10-31
+5     2026-10-31T09:15:13.941Z  job.analyzed      job adab1f0802a0: fit 80.9, apply-with-caveats
+6     2026-10-31T09:15:14.076Z  draft.generated   d-709a3891c3f9 (plain) for job adab1f0802a0
+7     2026-10-31T09:15:14.187Z  proposal.checked  text e3d9d040446b: passed (draft d-709a3891c3f9)
+8     2026-10-31T09:15:14.293Z  proposal.checked  text 99ea54621112: 8 errors
+9     2026-10-31T09:15:17.374Z  draft.approved    d-709a3891c3f9 approved, binding 1dfedef5eb2f
+10    2026-10-31T09:15:18.637Z  draft.exported    d-709a3891c3f9 exported, 579 bytes
+11    2026-10-31T09:15:18.848Z  outcome.recorded  d-709a3891c3f9: replied - asked for a call
 $ proposal-desk verify-log
-Hash chain: OK, 11 entries, head a676cf213aadab1f454ec44a03013f1c8076d8547a9f9c93b772ff1077b0ca2d
+Hash chain: OK, 11 entries, head 47f70afba7cd5c2a292b221e82d8e7b39f7c2ffd55738ed7ff5fa1f6f5350e9f
 Stored objects checked: 2, all present and intact
 Note: truncating the end of the log is only detectable if you remember an earlier head hash.
 ```
 
-The state directory holds only `log.jsonl` and `objects/` (plus `config.json` once you apply a proposal),
-created `0700` and `0600`.
+The state directory holds `log.jsonl` and `objects/` (plus `facts.json` if you use the default facts location,
+and `config.json` once you apply a proposal), created `0700` and `0600`.
 
 ## Commands
 
@@ -417,7 +418,7 @@ created `0700` and `0600`.
 | `analyze <job\|->` | coverage matrix, risk flags, rate guidance, fit score, recommendation (`--json`) |
 | `draft <job\|->` | proposal with footnoted provenance (`--tone plain\|concise`, `--json`) |
 | `check <proposal> --job <job>` | independent verification; exit 1 on violations (`--json`) |
-| `approve <draft-id>` | record a human approval at a terminal |
+| `approve <draft-id> [--text <file>]` | record a human approval at a terminal; `--text` approves your hand-edited version instead |
 | `export <draft-id> --out <file>` | write an approved, unchanged draft (`--force` to overwrite) |
 | `outcome record <draft-id> <outcome>` | `replied`, `interview`, `hired`, `no-response` or `declined`; `--note`, `--bid` |
 | `insights` | reply rates by flags, fit band, bid against budget and tone, with sample sizes |
@@ -477,14 +478,14 @@ Layers ([ADR 0003](docs/adr/0003-layers-with-enforced-dependency-rule.md)): `src
 
 ### Tests and coverage
 
-`npm test` runs 315 tests in 28 files, offline, organised by layer:
+`npm test` runs 320 tests in 29 files, offline, organised by layer:
 
 | Directory | Tests | What it covers |
 | --- | ---: | --- |
 | `tests/domain` | 185 | unit and property-style tests of the pure rules (seeded generators: SHA-256 against `node:crypto`, canonical JSON, log tampering, every draft passing its own check) |
-| `tests/application` | 41 | every use case against in-memory fakes of the ports |
+| `tests/application` | 45 | every use case against in-memory fakes of the ports |
 | `tests/infrastructure` (with `tests/contracts`) | 48 | the same port contracts run against the fake **and** the real file adapters, plus permissions, symlinks, locks, tampering, the terminal prompt, argument parsing |
-| `tests/e2e` | 33 | the CLI end to end with real files, the compiled binary as a separate process, and hostile job posts |
+| `tests/e2e` | 34 | the CLI end to end with real files, the compiled binary as a separate process, and hostile job posts |
 | `tests/architecture` | 8 | the dependency rule, no network, no runtime dependencies (and a test that the checks detect violations) |
 
 `npm run coverage` (V8 provider) fails below the thresholds in `vitest.config.ts`. Last run:
@@ -492,10 +493,10 @@ Layers ([ADR 0003](docs/adr/0003-layers-with-enforced-dependency-rule.md)): `src
 | Layer | Statements | Branches | Functions | Lines | Target |
 | --- | ---: | ---: | ---: | ---: | --- |
 | `src/domain` | 98.66% | 94.71% | 99.73% | 99.58% | 95% |
-| `src/application` | 98.27% | 92.96% | 100% | 100% | 90% |
-| `src/infrastructure` | 96.50% | 87.09% | 98.37% | 98.81% | |
-| `src/composition` | 85.71% | 100% | 80% | 83.33% | |
-| **all of `src`** | **98.04%** | **93.11%** | **99.29%** | **99.33%** | 85% |
+| `src/application` | 98.33% | 94.09% | 100% | 100% | 90% |
+| `src/infrastructure` | 96.51% | 87.28% | 98.37% | 98.82% |  |
+| `src/composition` | 85.71% | 100% | 80% | 83.33% |  |
+| **all of `src`** | **98.05%** | **93.26%** | **99.29%** | **99.33%** | 85% |
 
 `src/composition/main.ts` is exercised by the compiled-binary tests, which run in a separate process and so
 do not count towards coverage.
