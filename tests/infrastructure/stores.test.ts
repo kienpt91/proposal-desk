@@ -135,11 +135,11 @@ describe('FileLogStore', () => {
     expect(await log.readAll()).toEqual([]);
   });
 
-  it('removes a stale lock left by a crashed process', async () => {
+  it('removes a lock file with unreadable contents once it is older than the stale age', async () => {
     const dir = await stateDir();
     const log = new FileLogStore(dir);
     const lock = join(dir, 'log.lock');
-    writeFileSync(lock, '1\n', { mode: 0o600 });
+    writeFileSync(lock, 'garbage from an older version\n', { mode: 0o600 });
     const old = new Date(Date.now() - 120_000);
     utimesSync(lock, old, old);
     await log.append((previous) => nextEntry(previous, '2026-10-31T10:00:00.000Z', 'job.analyzed', {}));
@@ -149,8 +149,8 @@ describe('FileLogStore', () => {
 
   it('gives up with a clear message when a live process holds the lock', async () => {
     const dir = await stateDir();
-    const log = new FileLogStore(dir, { staleMs: 60_000, waitMs: 120 });
-    writeFileSync(join(dir, 'log.lock'), '1\n', { mode: 0o600 });
+    const log = new FileLogStore(dir, { staleMs: 60_000, waitMs: 120, maxHoldMs: 600_000 });
+    writeFileSync(join(dir, 'log.lock'), `${process.pid}:abcdef\n`, { mode: 0o600 });
     const error = await rejection(log.append((previous) => nextEntry(previous, '2026-10-31T10:00:00.000Z', 'job.analyzed', {})));
     expect(error.message).toContain('holds');
     expect(existsSync(join(dir, 'log.lock'))).toBe(true);
@@ -178,7 +178,8 @@ describe('FileFactStore', () => {
     const invalid = await rejection(store.load());
     expect(invalid.message).toContain('not a valid facts file');
     expect(invalid.details.join('\n')).toContain('facts[0].claim');
-    await store.save(FactBase.empty().add(fact()).value);
+    writeFileSync(path, JSON.stringify({ schema: 1, facts: [] }), { mode: 0o640 });
+    await store.update(() => FactBase.empty().add(fact()).value);
     expect(statSync(path).mode & 0o777).toBe(0o640);
     expect(readFileSync(path, 'utf8').endsWith('}\n')).toBe(true);
     expect(JSON.parse(readFileSync(path, 'utf8'))).toMatchObject({ schema: 1, facts: [{ id: 'ts-services', evidence: { kind: 'file-hash' } }] });
@@ -186,7 +187,7 @@ describe('FileFactStore', () => {
 
   it('creates new facts files private', async () => {
     const path = join(tmp(), 'new-facts.json');
-    await new FileFactStore(path).save(FactBase.empty());
+    await new FileFactStore(path).update(() => FactBase.empty());
     expect(statSync(path).mode & 0o777).toBe(0o600);
   });
 });

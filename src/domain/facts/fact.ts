@@ -154,7 +154,7 @@ function parseAttrs(raw: unknown, category: FactCategory, path: string, issues: 
   }
   const spec = ATTR_SPECS[category];
   for (const [key, value] of Object.entries(raw)) {
-    const check = spec[key];
+    const check = Object.hasOwn(spec, key) ? spec[key] : undefined;
     if (check === undefined) {
       issues.push(`${path}.${key}: not allowed for category ${category}`);
       continue;

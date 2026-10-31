@@ -81,12 +81,33 @@ export function factStoreContract(name: string, create: Factory<FactStore>): voi
       expect(await (await create()).load()).toBeUndefined();
     });
 
-    it('round-trips facts and replaces them on save', async () => {
+    it('round-trips facts and replaces them on update', async () => {
       const store = await create();
-      await store.save(base());
+      await store.update(() => base());
       expect((await store.load())?.facts).toEqual(base().facts);
-      await store.save(FactBase.empty());
+      await store.update(() => FactBase.empty());
       expect((await store.load())?.facts).toEqual([]);
+    });
+
+    it('hands the current facts to the change, and undefined when there is no file yet', async () => {
+      const store = await create();
+      const seen: (number | undefined)[] = [];
+      await store.update((current) => {
+        seen.push(current?.facts.length);
+        return base();
+      });
+      await store.update((current) => {
+        seen.push(current?.facts.length);
+        return current as FactBase;
+      });
+      expect(seen).toEqual([undefined, 2]);
+    });
+
+    it('keeps the old facts when the change throws', async () => {
+      const store = await create();
+      await store.update(() => base());
+      await expect(store.update(() => { throw new Error('rejected'); })).rejects.toThrow('rejected');
+      expect((await store.load())?.facts).toEqual(base().facts);
     });
   });
 }

@@ -180,7 +180,7 @@ function validate(raw: unknown, spec: Spec, path: string, issues: string[]): unk
     return undefined;
   }
   const record = raw as Record<string, unknown>;
-  for (const key of Object.keys(record)) if (!(key in spec)) issues.push(`${path}.${key}: unknown field`);
+  for (const key of Object.keys(record)) if (!Object.hasOwn(spec, key)) issues.push(`${path}.${key}: unknown field`);
   const out: Record<string, unknown> = {};
   for (const [key, rule] of Object.entries(spec)) {
     const at = `${path}.${key}`;
@@ -211,7 +211,7 @@ export function parseConfig(raw: unknown): Result<Config> {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return fail(['config: must be an object']);
   const record = raw as Record<string, unknown>;
   const issues: string[] = [];
-  for (const key of Object.keys(record)) if (key !== 'schema' && key !== 'version' && !(key in SPEC)) issues.push(`config.${key}: unknown field`);
+  for (const key of Object.keys(record)) if (key !== 'schema' && key !== 'version' && !Object.hasOwn(SPEC, key)) issues.push(`config.${key}: unknown field`);
   if (record.schema !== 1) issues.push('config.schema: must be 1');
   if (typeof record.version !== 'number' || !Number.isInteger(record.version) || record.version < 1 || record.version > 1_000_000) {
     issues.push('config.version: must be a positive integer');

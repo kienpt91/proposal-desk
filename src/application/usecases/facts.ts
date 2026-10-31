@@ -34,7 +34,6 @@ export interface AddFactResult {
  */
 export async function addFact(deps: Deps, input: AddFactInput): Promise<AddFactResult> {
   const handle = deps.facts(input.factsPath);
-  const base = (await handle.store.load()) ?? FactBase.empty();
   const checkable = isCheckable(input.evidenceKind);
   let digest: string | undefined;
   if (checkable) {
@@ -62,14 +61,17 @@ export async function addFact(deps: Deps, input: AddFactInput): Promise<AddFactR
     'fact',
   );
   if (!parsed.ok) throw new AppError('invalid', 'the fact was rejected', parsed.error);
-  let change;
-  try {
-    change = base.add(parsed.value);
-  } catch (error) {
-    throw new AppError('invalid', 'the fact was rejected', [error instanceof Error ? error.message : String(error)]);
-  }
-  await handle.store.save(change.value);
-  await logEvents(deps, change.events);
+  let events: readonly FactEvent[] = [];
+  await handle.store.update((current) => {
+    try {
+      const change = (current ?? FactBase.empty()).add(parsed.value);
+      events = change.events;
+      return change.value;
+    } catch (error) {
+      throw new AppError('invalid', 'the fact was rejected', [error instanceof Error ? error.message : String(error)]);
+    }
+  });
+  await logEvents(deps, events);
   return { fact: parsed.value, assessment: assessFact(parsed.value), location: handle.store.location };
 }
 
@@ -95,35 +97,38 @@ export interface VerifyFactResult {
 /** Re-hashes the evidence file of every checkable fact. A match verifies (or re-verifies) it; a mismatch or a missing file makes it stale. */
 export async function verifyFacts(deps: Deps, input: { readonly factsPath: string | undefined; readonly ids?: readonly string[] }): Promise<readonly VerifyFactResult[]> {
   const handle = deps.facts(input.factsPath);
-  let base = await requireFacts(handle);
+  await requireFacts(handle); // a clear "no facts file" error before anything is locked
   const wanted = input.ids === undefined || input.ids.length === 0 ? undefined : new Set(input.ids);
-  if (wanted !== undefined) {
-    for (const id of wanted) if (base.get(id) === undefined) throw new AppError('missing', `no fact with id ${id}`);
-  }
-  const day = today(deps);
   const results: VerifyFactResult[] = [];
   const events: FactEvent[] = [];
-  for (const fact of base.facts) {
-    if (wanted !== undefined && !wanted.has(fact.id)) continue;
-    if (!isCheckable(fact.evidence.kind)) {
-      results.push({ factId: fact.id, outcome: 'skipped', detail: `evidence kind ${fact.evidence.kind} cannot be re-checked offline` });
-      continue;
+  await handle.store.update(async (current) => {
+    let base = current ?? FactBase.empty();
+    if (wanted !== undefined) {
+      for (const id of wanted) if (base.get(id) === undefined) throw new AppError('missing', `no fact with id ${id}`);
     }
-    const digest = await handle.evidence.digestOf(fact.evidence.reference);
-    if (digest.ok && digest.digest === fact.evidence.digest) {
-      const change = base.markVerified(fact.id, day);
-      base = change.value;
-      events.push(...change.events);
-      results.push({ factId: fact.id, outcome: 'verified', detail: `${fact.evidence.reference} matches the recorded digest` });
-    } else {
-      const reason = digest.ok ? `${fact.evidence.reference} no longer matches the recorded digest` : `${fact.evidence.reference}: ${digest.reason}`;
-      const change = base.markStale(fact.id, reason);
-      base = change.value;
-      events.push(...change.events);
-      results.push({ factId: fact.id, outcome: 'stale', detail: reason });
+    const day = today(deps);
+    for (const fact of base.facts) {
+      if (wanted !== undefined && !wanted.has(fact.id)) continue;
+      if (!isCheckable(fact.evidence.kind)) {
+        results.push({ factId: fact.id, outcome: 'skipped', detail: `evidence kind ${fact.evidence.kind} cannot be re-checked offline` });
+        continue;
+      }
+      const digest = await handle.evidence.digestOf(fact.evidence.reference);
+      if (digest.ok && digest.digest === fact.evidence.digest) {
+        const change = base.markVerified(fact.id, day);
+        base = change.value;
+        events.push(...change.events);
+        results.push({ factId: fact.id, outcome: 'verified', detail: `${fact.evidence.reference} matches the recorded digest` });
+      } else {
+        const reason = digest.ok ? `${fact.evidence.reference} no longer matches the recorded digest` : `${fact.evidence.reference}: ${digest.reason}`;
+        const change = base.markStale(fact.id, reason);
+        base = change.value;
+        events.push(...change.events);
+        results.push({ factId: fact.id, outcome: 'stale', detail: reason });
+      }
     }
-  }
-  await handle.store.save(base);
+    return base;
+  });
   await logEvents(deps, events);
   return results;
 }
@@ -141,24 +146,29 @@ export async function staleFacts(
   input: { readonly factsPath: string | undefined; readonly days?: number; readonly mark: boolean },
 ): Promise<{ readonly days: number; readonly entries: readonly StaleEntry[] }> {
   const handle = deps.facts(input.factsPath);
-  let base = await requireFacts(handle);
   const days = input.days ?? (await loadConfig(deps)).facts.staleAfterDays;
   const day = today(deps);
-  const entries: StaleEntry[] = base.facts.filter((f) => f.status === 'stale').map((f) => ({ factId: f.id, claim: f.claim, reason: 'already stale', marked: false }));
+  const entries: StaleEntry[] = [];
   const events: FactEvent[] = [];
-  for (const fact of base.overdue(day, days)) {
-    const age = factAgeDays(fact, day);
-    const reason = age === undefined ? 'no check date or evidence date' : `last checked or dated ${age} days ago (limit ${days})`;
-    if (input.mark) {
-      const change = base.markStale(fact.id, reason);
-      base = change.value;
-      events.push(...change.events);
+  const scan = (start: FactBase, mark: boolean): FactBase => {
+    let base = start;
+    entries.length = 0;
+    events.length = 0;
+    entries.push(...base.facts.filter((f) => f.status === 'stale').map((f) => ({ factId: f.id, claim: f.claim, reason: 'already stale', marked: false })));
+    for (const fact of base.overdue(day, days)) {
+      const age = factAgeDays(fact, day);
+      const reason = age === undefined ? 'no check date or evidence date' : `last checked or dated ${age} days ago (limit ${days})`;
+      if (mark) {
+        const change = base.markStale(fact.id, reason);
+        base = change.value;
+        events.push(...change.events);
+      }
+      entries.push({ factId: fact.id, claim: fact.claim, reason, marked: mark });
     }
-    entries.push({ factId: fact.id, claim: fact.claim, reason, marked: input.mark });
-  }
-  if (input.mark && events.length > 0) {
-    await handle.store.save(base);
-    await logEvents(deps, events);
-  }
+    return base;
+  };
+  if (input.mark) await handle.store.update((current) => scan(current ?? FactBase.empty(), true));
+  else scan(await requireFacts(handle), false);
+  await logEvents(deps, events);
   return { days, entries };
 }

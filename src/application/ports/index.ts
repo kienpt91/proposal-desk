@@ -13,7 +13,11 @@ export interface FactStore {
   readonly location: string;
   /** The facts, or undefined when the file does not exist yet. Throws AppError when it exists but cannot be read or parsed. */
   load(): Promise<FactBase | undefined>;
-  save(base: FactBase): Promise<void>;
+  /**
+   * Reads the facts, lets `change` produce the new ones and writes them, all while holding a lock, so concurrent runs cannot lose
+   * each other's changes. Nothing is written when `change` throws.
+   */
+  update(change: (current: FactBase | undefined) => Promise<FactBase> | FactBase): Promise<void>;
 }
 
 export type EvidenceDigest = { readonly ok: true; readonly digest: string } | { readonly ok: false; readonly reason: string };

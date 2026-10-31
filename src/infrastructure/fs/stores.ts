@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto';
 import { constants, promises as fs } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
-import { setTimeout as sleep } from 'node:timers/promises';
 import { AppError } from '../../application/errors.js';
 import type { ConfigStore, EvidenceChecker, EvidenceDigest, FactStore, FileSink, LogStore, ObjectStore } from '../../application/ports/index.js';
 import { parseConfig, type Config } from '../../domain/config/config.js';
 import { FactBase } from '../../domain/facts/fact-base.js';
 import { parseLogEntry, type LogEntry } from '../../domain/log/chain.js';
 import { escapeUnsafe } from '../../domain/shared/text-safety.js';
+import { DEFAULT_LOCK, FileLock, type LockTiming } from './lock.js';
 import { ensurePrivateDir, isMissing, readTextIfExists, SIZE_LIMITS, STATE_FILE, USER_FILE, writeTextAtomic, type TrustOptions } from './safe-fs.js';
 
 const NOFOLLOW = constants.O_NOFOLLOW ?? 0;
@@ -20,11 +20,12 @@ function parseJson(text: string, what: string): unknown {
   }
 }
 
-/** facts.json at any path the user chooses. New files are created private (0600). */
+/** facts.json at any path the user chooses. New files are created private (0600); changes are made under a lock so concurrent runs cannot lose each other's updates. */
 export class FileFactStore implements FactStore {
   constructor(
     readonly location: string,
     private readonly trust: TrustOptions = USER_FILE,
+    private readonly timing: LockTiming = DEFAULT_LOCK,
   ) {}
 
   async load(): Promise<FactBase | undefined> {
@@ -35,30 +36,45 @@ export class FileFactStore implements FactStore {
     return parsed.value;
   }
 
-  async save(base: FactBase): Promise<void> {
-    await writeTextAtomic(this.location, `${JSON.stringify(base.toDocument(), null, 2)}\n`, { mode: 0o600, overwrite: true, trust: this.trust });
+  async update(change: (current: FactBase | undefined) => Promise<FactBase> | FactBase): Promise<void> {
+    const lock = await new FileLock(`${this.location}.lock`, this.timing, 'facts file').acquire();
+    try {
+      const next = await change(await this.load());
+      await lock.assertHeld();
+      await writeTextAtomic(this.location, `${JSON.stringify(next.toDocument(), null, 2)}\n`, { mode: 0o600, overwrite: true, trust: this.trust });
+    } finally {
+      await lock.release();
+    }
   }
 }
 
-/** Hashes local evidence files, resolving relative references against a base directory. */
+/** Hashes local evidence files, resolving relative references against a base directory. A symbolic link, a FIFO or any other
+ *  non-regular file is refused without being opened for reading. */
 export class FsEvidenceChecker implements EvidenceChecker {
   constructor(private readonly baseDir: string) {}
 
   async digestOf(reference: string): Promise<EvidenceDigest> {
     const path = isAbsolute(reference) ? reference : resolve(this.baseDir, reference);
-    let handle;
+    let before;
     try {
-      handle = await fs.open(path, constants.O_RDONLY);
+      before = await fs.lstat(path);
     } catch (error) {
       return { ok: false, reason: isMissing(error) ? 'no such file' : `cannot open (${(error as NodeJS.ErrnoException).code ?? 'error'})` };
+    }
+    if (before.isSymbolicLink()) return { ok: false, reason: 'a symbolic link (point at the file itself)' };
+    if (!before.isFile()) return { ok: false, reason: 'not a regular file' };
+    let handle;
+    try {
+      handle = await fs.open(path, constants.O_RDONLY | NOFOLLOW | (constants.O_NONBLOCK ?? 0));
+    } catch (error) {
+      return { ok: false, reason: `cannot open (${(error as NodeJS.ErrnoException).code ?? 'error'})` };
     }
     try {
       const stat = await handle.stat();
       if (!stat.isFile()) return { ok: false, reason: 'not a regular file' };
       if (stat.size > SIZE_LIMITS.evidenceFile) return { ok: false, reason: `larger than ${SIZE_LIMITS.evidenceFile} bytes` };
       const hash = createHash('sha256');
-      const stream = handle.createReadStream({ autoClose: false });
-      for await (const chunk of stream) hash.update(chunk as Buffer);
+      for await (const chunk of handle.createReadStream({ autoClose: false })) hash.update(chunk as Buffer);
       return { ok: true, digest: hash.digest('hex') };
     } catch (error) {
       return { ok: false, reason: `cannot read (${(error as NodeJS.ErrnoException).code ?? 'error'})` };
@@ -115,26 +131,17 @@ export class FileObjectStore implements ObjectStore {
   }
 }
 
-export interface LockTiming {
-  /** A lock file older than this is assumed to belong to a crashed process and is removed. */
-  readonly staleMs: number;
-  /** How long to wait for a lock held by a running process before giving up. */
-  readonly waitMs: number;
-}
-
-const DEFAULT_LOCK: LockTiming = { staleMs: 30_000, waitMs: 5_000 };
-
 /** `<state>/log.jsonl`: one JSON entry per line, appended under a lock file so concurrent runs cannot fork the chain. */
 export class FileLogStore implements LogStore {
   private readonly file: string;
-  private readonly lock: string;
+  private readonly lockFile: string;
 
   constructor(
     private readonly dir: string,
     private readonly timing: LockTiming = DEFAULT_LOCK,
   ) {
     this.file = join(dir, 'log.jsonl');
-    this.lock = join(dir, 'log.lock');
+    this.lockFile = join(dir, 'log.lock');
   }
 
   async readAll(): Promise<LogEntry[]> {
@@ -153,10 +160,11 @@ export class FileLogStore implements LogStore {
 
   async append(build: (previous: LogEntry | undefined) => LogEntry): Promise<LogEntry> {
     await ensurePrivateDir(this.dir);
-    const release = await this.acquire();
+    const lock = await new FileLock(this.lockFile, this.timing, 'log').acquire();
     try {
       const previous = (await this.readAll()).at(-1);
       const entry = build(previous);
+      await lock.assertHeld();
       const handle = await fs.open(this.file, constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | NOFOLLOW, 0o600);
       try {
         await handle.writeFile(`${JSON.stringify(entry)}\n`, 'utf8');
@@ -164,32 +172,10 @@ export class FileLogStore implements LogStore {
       } finally {
         await handle.close();
       }
+      await lock.assertHeld();
       return entry;
     } finally {
-      await release();
-    }
-  }
-
-  private async acquire(): Promise<() => Promise<void>> {
-    const deadline = Date.now() + this.timing.waitMs;
-    for (;;) {
-      try {
-        const handle = await fs.open(this.lock, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | NOFOLLOW, 0o600);
-        await handle.writeFile(`${process.pid}\n`);
-        await handle.close();
-        return async () => {
-          await fs.unlink(this.lock).catch(() => undefined);
-        };
-      } catch (error) {
-        if (!(error instanceof Error) || (error as NodeJS.ErrnoException).code !== 'EEXIST') throw new AppError('io', `cannot lock the log: ${(error as Error).message}`);
-        const age = await fs.stat(this.lock).then((s) => Date.now() - s.mtimeMs).catch(() => 0);
-        if (age > this.timing.staleMs) {
-          await fs.unlink(this.lock).catch(() => undefined);
-          continue;
-        }
-        if (Date.now() > deadline) throw new AppError('io', `another proposal-desk process holds ${this.lock}; remove it if no process is running`);
-        await sleep(25);
-      }
+      await lock.release();
     }
   }
 }

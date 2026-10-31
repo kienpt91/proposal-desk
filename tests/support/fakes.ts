@@ -98,8 +98,8 @@ export class InMemoryFactStore implements FactStore {
     return this.base;
   }
 
-  async save(base: FactBase): Promise<void> {
-    this.base = base;
+  async update(change: (current: FactBase | undefined) => Promise<FactBase> | FactBase): Promise<void> {
+    this.base = await change(this.base);
   }
 }
 
