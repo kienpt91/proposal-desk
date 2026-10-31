@@ -1,0 +1,33 @@
+# --- secret files: never commit these (also enforced by scripts/secret-scan.sh) ---
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+.netrc
+/credentials.json
+service-account*.json
+/secrets.json
+/secrets.yml
+/secrets.yaml
+/secrets.toml
+*.tfstate
+*.tfstate.*
+
+# --- user data: real facts, job posts and state live outside the repository ---
+.proposal-desk/
+*.local.json
+
+# --- build and tooling output ---
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.DS_Store
