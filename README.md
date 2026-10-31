@@ -537,7 +537,7 @@ Layers ([ADR 0003](docs/adr/0003-layers-with-enforced-dependency-rule.md)): `src
 
 ### Tests and coverage
 
-`npm test` runs 406 tests in 38 files, offline, organised by layer:
+`npm test` runs 408 tests in 38 files, offline, organised by layer:
 
 | Directory | Tests | What it covers |
 | --- | ---: | --- |
@@ -545,17 +545,18 @@ Layers ([ADR 0003](docs/adr/0003-layers-with-enforced-dependency-rule.md)): `src
 | `tests/application` | 50 | every use case against in-memory fakes of the ports |
 | `tests/infrastructure` (with `tests/contracts`) | 59 | the same port contracts run against the fake **and** the real file adapters, plus permissions, symlinks, locks, tampering, the terminal prompt, argument parsing |
 | `tests/e2e` | 34 | the CLI end to end with real files, the compiled binary as a separate process, and hostile job posts |
+| `tests/regression` | 58 | regression tests for the security-review findings, each written to fail before its fix: forged approvals, forged fact status, verifier bypasses, look-alike and invisible characters, number notations, negation tricks, hidden markup, lock races |
 | `tests/architecture` | 8 | the dependency rule, no network, no runtime dependencies (and a test that the checks detect violations) |
 
 `npm run coverage` (V8 provider) fails below the thresholds in `vitest.config.ts`. Last run:
 
 | Layer | Statements | Branches | Functions | Lines | Target |
 | --- | ---: | ---: | ---: | ---: | --- |
-| `src/domain` | 98.73% | 94.84% | 99.52% | 99.54% | 95% |
+| `src/domain` | 98.73% | 94.90% | 99.52% | 99.54% | 95% |
 | `src/application` | 97.87% | 92.31% | 100% | 99.71% | 90% |
 | `src/infrastructure` | 94.88% | 85.71% | 95.65% | 98.10% |  |
 | `src/composition` | 85.71% | 100% | 80% | 83.33% |  |
-| **all of `src`** | **97.71%** | **92.79%** | **98.61%** | **99.13%** | 85% |
+| **all of `src`** | **97.71%** | **92.84%** | **98.61%** | **99.13%** | 85% |
 
 `src/composition/main.ts` is exercised by the compiled-binary tests, which run in a separate process and so
 do not count towards coverage.
