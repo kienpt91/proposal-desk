@@ -122,3 +122,13 @@ describe('verifyProposal', () => {
     expect(check(GOOD, EXAMPLE_JOB, exampleFacts()).violations.map((v) => v.rule)).toEqual([]);
   });
 });
+
+describe('verifier wording', () => {
+  it('uses technology labels and correct articles in its messages', () => {
+    const report = check('Reach me at jane@example.com or +84 912 345 678. I have deep Kubernetes experience.');
+    const details = report.violations.map((v) => v.detail);
+    expect(details).toContain('An email in a proposal invites the client off the platform and leaks personal data.');
+    expect(details).toContain('A phone number in a proposal invites the client off the platform and leaks personal data.');
+    expect(details).toContain('Kubernetes is not covered by any verified fact.');
+  });
+});

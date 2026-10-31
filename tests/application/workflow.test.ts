@@ -122,7 +122,7 @@ describe('outcomes and insights', () => {
     const insights = await insightsReport(h);
     expect(insights).toMatchObject({ drafts: 1, withOutcome: 1, pending: 0 });
     expect(insights.overall).toMatchObject({ n: 1, replies: 1, small: true });
-    expect(insights.warnings[0]).toContain('Only 1 outcomes (minimum 20)');
+    expect(insights.warnings[0]).toContain('Only 1 outcome (minimum 20)');
     expect(insights.suggestions).toEqual([]);
   });
 

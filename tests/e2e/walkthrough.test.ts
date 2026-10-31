@@ -64,7 +64,7 @@ describe('walkthrough with the shipped example', () => {
     const insights = await s.run(['insights']);
     expect(insights.code).toBe(0);
     expect(insights.stdout).toContain('Overall reply rate: 100% (1 of 1)  [small sample]');
-    expect(insights.stdout).toContain('Only 1 outcomes (minimum 20)');
+    expect(insights.stdout).toContain('Only 1 outcome (minimum 20)');
 
     const past = await s.run(['history']);
     expect(past.stdout).toMatch(/draft\.generated\s+d-/);

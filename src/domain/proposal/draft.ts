@@ -256,7 +256,7 @@ export function renderAudit(draft: Draft, analysis: JobAnalysis): string {
     group.push(`${s.text}${s.factIds.map((id) => `[^${numberOf.get(id)}]`).join('')}`);
   }
   flush();
-  const provenance = draft.citations.map((c) => `[^${c.n}]: ${c.factId} (${c.trust}; ${c.evidenceKind}: ${c.reference}) ${c.claim}`);
+  const provenance = draft.citations.map((c) => `[^${c.n}]: ${c.factId} (${c.evidenceKind === 'self-declared' ? 'self-declared' : `${c.trust}; ${c.evidenceKind}`}: ${c.reference}) ${c.claim}`);
   const notes = reviewNotes(analysis, draft).map((l) => `- ${l}`);
   return `${body.join('\n\n')}\n\n## Provenance\n\n${provenance.join('\n')}\n\n## Review notes\n\n${notes.join('\n')}\n`;
 }

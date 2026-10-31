@@ -2,7 +2,7 @@ import { analyzeJob } from '../analysis/analyze.js';
 import { declaredCountry } from '../analysis/coverage.js';
 import { rateFloorOf } from '../analysis/rate.js';
 import { placeIncludes, findPlaces } from '../dictionary/geo.js';
-import { techIdsIn } from '../dictionary/tech.js';
+import { techById, techIdsIn } from '../dictionary/tech.js';
 import type { Config } from '../config/config.js';
 import { extractNumbers, type FactAssessment } from '../facts/claim-policy.js';
 import type { FactBase } from '../facts/fact-base.js';
@@ -139,7 +139,7 @@ export function verifyProposal(input: { readonly markdown: string; readonly job:
       const known = assessments.some((a) => a.fact.evidence.reference === finding.excerpt || finding.excerpt.startsWith(a.fact.evidence.reference));
       if (!known) add({ rule: 'unverified-link', severity: 'warning', excerpt: finding.excerpt, detail: 'The link does not appear as evidence in any fact.' });
     } else {
-      add({ rule: 'contact-details', severity: 'error', excerpt: finding.excerpt, detail: `A ${finding.kind} in a proposal invites the client off the platform and leaks personal data.` });
+      add({ rule: 'contact-details', severity: 'error', excerpt: finding.excerpt, detail: `${finding.kind === 'email' ? 'An' : 'A'} ${finding.kind === 'phone' ? 'phone number' : finding.kind} in a proposal invites the client off the platform and leaks personal data.` });
     }
   }
 
@@ -198,10 +198,11 @@ export function verifyProposal(input: { readonly markdown: string; readonly job:
       if (covered.has(tech) || gap) continue;
       if (!firstPerson && jobTechs.has(tech)) continue;
       const known = usable.some((a) => a.techs.includes(tech));
+      const label = techById(tech)?.label ?? tech;
       if (firstPerson || CAPABILITY_CLAIM.test(sentence)) {
-        add({ rule: 'unverified-capability', severity: 'error', sentence: n, excerpt, detail: known ? `${tech} is in your facts, but this sentence is not traceable to the fact that covers it.` : `${tech} is not covered by any verified fact.` });
+        add({ rule: 'unverified-capability', severity: 'error', sentence: n, excerpt, detail: known ? `${label} is in your facts, but this sentence is not traceable to the fact that covers it.` : `${label} is not covered by any verified fact.` });
       } else {
-        add({ rule: 'unverified-technology', severity: 'warning', sentence: n, excerpt, detail: `${tech} is mentioned but appears in neither your facts nor the job post.` });
+        add({ rule: 'unverified-technology', severity: 'warning', sentence: n, excerpt, detail: `${label} is mentioned but appears in neither your facts nor the job post.` });
       }
     }
 

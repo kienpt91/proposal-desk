@@ -144,6 +144,7 @@ describe('draftProposal', () => {
     expect(md).toContain('Available 20 hours per week.[^4] For this work my rate would be 53 USD per hour.[^5]');
     expect(md).toContain('## Provenance');
     expect(md).toContain('[^1]: ts-services (verified; file-hash: evidence/ts-services.md) Built and maintained');
+    expect(md).toContain('[^4]: availability (self-declared: own statement) Available 20 hours per week');
     expect(md).toContain('## Review notes');
     expect(md).toContain('- The client asks (answer by hand): Also tell us');
     expect(md).toContain('- Recommendation: apply-with-caveats (fit 80.9).');

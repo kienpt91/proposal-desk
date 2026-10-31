@@ -10,6 +10,8 @@ import type { StaleEntry, VerifyFactResult } from '../../application/usecases/fa
 
 const pad = (text: string, width: number): string => text.padEnd(width);
 const money = (n: number): string => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+export const plural = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? '' : 's'}`;
+const truncateText = (text: string, max: number): string => (text.length <= max ? text : `${text.slice(0, max - 1)}…`);
 const pct = (rate: number | undefined): string => (rate === undefined ? 'n/a' : `${Math.round(rate * 100)}%`);
 
 const RECOMMENDATION: Readonly<Record<string, string>> = { apply: 'APPLY', 'apply-with-caveats': 'APPLY WITH CAVEATS', skip: 'SKIP' };
@@ -60,7 +62,7 @@ export function renderAnalysis(analysis: JobAnalysis, factsLocation: string): st
   lines.push(`  Location restriction: ${spec.locationRestriction === undefined ? 'none found' : `${spec.locationRestriction.mode} ${spec.locationRestriction.places.join(', ')}`}`);
   lines.push(`  Timezone requirement: ${spec.timezone === undefined ? 'none found' : `${spec.timezone.label} (UTC${spec.timezone.offset >= 0 ? '+' : ''}${spec.timezone.offset})`}`);
   lines.push(`  Requested attachments: ${spec.attachments.length === 0 ? 'none' : spec.attachments.map((a) => a.kind).join(', ')}`);
-  lines.push(`  Client asks: ${spec.asks.length === 0 ? 'none' : ''}`);
+  lines.push(spec.asks.length === 0 ? '  Client asks: none' : '  Client asks:');
   for (const ask of spec.asks) lines.push(`    - (${ask.kind}) ${ask.text}`);
   const m = analysis.metadata;
   const meta = Object.entries(m).map(([k, v]) => `${k}=${String(v)}`);
@@ -69,12 +71,16 @@ export function renderAnalysis(analysis: JobAnalysis, factsLocation: string): st
 }
 
 export function renderDraftFooter(draft: Draft): string {
+  const commands: readonly (readonly [string, string])[] = [
+    ['proposal-desk check <file> --job <job>', 'verify an edited version'],
+    [`proposal-desk approve ${draft.id}`, 'record your approval (needs a terminal)'],
+    [`proposal-desk export ${draft.id} --out final.md`, 'write the approved text'],
+  ];
+  const width = Math.max(...commands.map(([command]) => command.length));
   return [
-    `Draft ${draft.id}: ${draft.wordCount} of ${draft.wordCap} words, tone ${draft.tone}, ${draft.citations.length} cited facts.`,
+    `Draft ${draft.id}: ${draft.wordCount} of ${draft.wordCap} words, tone ${draft.tone}, ${plural(draft.citations.length, 'cited fact')}.`,
     'Nothing was sent. Review it, then:',
-    `  proposal-desk check <file> --job <job>   verify any edited version`,
-    `  proposal-desk approve ${draft.id}          record your approval (needs a terminal)`,
-    `  proposal-desk export ${draft.id} --out final.md`,
+    ...commands.map(([command, what]) => `  ${pad(command, width)}  ${what}`),
   ].join('\n');
 }
 
@@ -82,7 +88,7 @@ export function renderCheck(report: CheckReport): string {
   const errors = report.violations.filter((v) => v.severity === 'error');
   const warnings = report.violations.filter((v) => v.severity === 'warning');
   const lines = [
-    `Check: ${report.ok ? 'PASSED' : 'FAILED'} (${errors.length} errors, ${warnings.length} warnings)   ${report.stats.words}/${report.stats.wordCap} words, ${report.stats.sentences} sentences, ${report.stats.questions} questions`,
+    `Check: ${report.ok ? 'PASSED' : 'FAILED'} (${plural(errors.length, 'error')}, ${plural(warnings.length, 'warning')})   ${report.stats.words}/${report.stats.wordCap} words, ${plural(report.stats.sentences, 'sentence')}, ${plural(report.stats.questions, 'question')}`,
   ];
   for (const v of report.violations) {
     lines.push(`  ${pad(v.severity, 7)} ${v.sentence === undefined ? '' : `sentence ${v.sentence}  `}${v.rule}`);
@@ -90,7 +96,8 @@ export function renderCheck(report: CheckReport): string {
     if (v.excerpt !== '') lines.push(`          > ${v.excerpt}`);
   }
   lines.push('Trace (sentence -> facts matched by content)');
-  for (const t of report.trace) lines.push(`  ${pad(String(t.index), 3)} ${t.factIds.length > 0 ? t.factIds.join(', ') : '-'}`);
+  const factWidth = Math.max(1, ...report.trace.map((t) => (t.factIds.length > 0 ? t.factIds.join(', ') : '-').length));
+  for (const t of report.trace) lines.push(`  ${pad(String(t.index), 3)} ${pad(t.factIds.length > 0 ? t.factIds.join(', ') : '-', factWidth)}  ${truncateText(t.text, 70)}`);
   return lines.join('\n');
 }
 

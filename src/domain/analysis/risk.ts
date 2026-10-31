@@ -57,7 +57,7 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     id: 'location-excluded',
     severity: 'hard',
-    title: 'Location restriction excludes your declared location',
+    title: 'Location restriction or preference excludes your declared location',
     rationale: 'Posts that say "US only" or "must be located in ..." are often enforced by tax, legal or contract rules. Applying wastes a bid and your time. Severity follows the wording: hard for firm restrictions ("only", "must be located in", residents, exclusions), warning for weaker wording ("based in"), info for mere preferences.',
     falsePositives: 'Posts that describe the company ("we are a US-based team looking for a developer") can read like a restriction. Weak cues are reported as warnings, preferences as info. Some clients waive the restriction for strong candidates.',
   },

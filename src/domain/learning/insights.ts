@@ -94,7 +94,7 @@ export function computeInsights(
 
   const warnings: string[] = [];
   if (overall.n === 0) warnings.push('No outcomes recorded yet: record some with `outcome record`.');
-  else if (overall.small) warnings.push(`Only ${overall.n} outcomes (minimum ${minSample}): every rate below is noise. Do not change anything because of it.`);
+  else if (overall.small) warnings.push(`Only ${overall.n} ${overall.n === 1 ? 'outcome' : 'outcomes'} (minimum ${minSample}): every rate below is noise. Do not change anything because of it.`);
   const smallBuckets = [flags, bands, bids, tones].flatMap((g) => g.buckets).filter((b) => b.n > 0 && b.small);
   if (overall.n >= minSample && smallBuckets.length > 0) warnings.push(`${smallBuckets.length} groups have fewer than ${minSample} outcomes and are marked small.`);
   warnings.push('These are correlations in a personal sample, not causes. The tool never changes scoring or templates by itself.');
