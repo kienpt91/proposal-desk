@@ -66,8 +66,8 @@ export const SUPERLATIVE_TERMS: readonly string[] = [
   '10x',
 ];
 
-/** Text that reads like an instruction aimed at an automated reader. Job posts are untrusted input. */
-export const INSTRUCTION_PATTERNS: readonly RegExp[] = [
+/** Text addressed to software that reads the post (an assistant, a scraper, an agent). Never obeyed; flagged. */
+export const AUTOMATION_DIRECTIVES: readonly RegExp[] = [
   /\bignore\b[^.\n]{0,40}\b(?:previous|prior|above|earlier|all)\b[^.\n]{0,30}\b(?:instructions?|prompts?|rules?|messages?)\b/i,
   /\bdisregard\b[^.\n]{0,40}\b(?:instructions?|rules?|prompts?)\b/i,
   /\bforget\b[^.\n]{0,30}\b(?:everything|instructions?|rules?)\b/i,
@@ -75,12 +75,16 @@ export const INSTRUCTION_PATTERNS: readonly RegExp[] = [
   /\byou are now\b/i,
   /\bas an? (?:ai|language model|assistant)\b/i,
   /\b(?:new|updated) instructions?\b/i,
-  /\bbegin (?:your|the) (?:proposal|reply|response|answer) with\b/i,
-  /\b(?:start|open) (?:your|the) (?:proposal|reply|response|answer) with\b/i,
+  /\b(?:ai|bot|llm|assistant|automated)\b[^.\n]{0,30}\b(?:reading|reads|read) this\b/i,
+];
+
+/** Instructions about what a proposal must contain. Legitimate screening, but never followed automatically. */
+export const SCREENING_INSTRUCTIONS: readonly RegExp[] = [
+  /\b(?:begin|start|open) (?:your|the) (?:proposal|reply|response|answer|cover letter|message) with\b/i,
   /\binclude the (?:word|phrase|code|secret)\b/i,
   /\bin your (?:proposal|reply|response|cover letter)\b[^.\n]{0,40}\b(?:mention|include|write|say|state|put)\b/i,
   /\bwrite (?:the )?(?:word|phrase)\b/i,
-  /\bmention (?:the )?(?:code ?word|passphrase|secret word)\b/i,
+  /\bmention (?:the )?(?:code ?word|passphrase|secret word|keyword)\b/i,
 ];
 
 function escapeForRegex(text: string): string {
@@ -97,9 +101,9 @@ export function findPhrases(text: string, list: readonly string[]): string[] {
   return out;
 }
 
-/** Returns the excerpt of the first instruction-like pattern found, or undefined. */
-export function findInstructionLikeText(text: string): string | undefined {
-  for (const pattern of INSTRUCTION_PATTERNS) {
+/** Returns the excerpt of the first automation directive found, or undefined. */
+export function findAutomationDirective(text: string): string | undefined {
+  for (const pattern of AUTOMATION_DIRECTIVES) {
     const m = pattern.exec(text);
     if (m !== null) return m[0];
   }
