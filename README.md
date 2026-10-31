@@ -494,9 +494,9 @@ Layers ([ADR 0003](docs/adr/0003-layers-with-enforced-dependency-rule.md)): `src
 | --- | ---: | ---: | ---: | ---: | --- |
 | `src/domain` | 98.66% | 94.71% | 99.73% | 99.58% | 95% |
 | `src/application` | 98.33% | 94.09% | 100% | 100% | 90% |
-| `src/infrastructure` | 96.51% | 87.28% | 98.37% | 98.82% |  |
+| `src/infrastructure` | 96.35% | 87.28% | 97.56% | 98.82% |  |
 | `src/composition` | 85.71% | 100% | 80% | 83.33% |  |
-| **all of `src`** | **98.05%** | **93.26%** | **99.29%** | **99.33%** | 85% |
+| **all of `src`** | **98.01%** | **93.26%** | **99.12%** | **99.33%** | 85% |
 
 `src/composition/main.ts` is exercised by the compiled-binary tests, which run in a separate process and so
 do not count towards coverage.
