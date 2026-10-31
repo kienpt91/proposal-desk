@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ConfigStore, FactStore, LogStore, ObjectStore } from '../../src/application/ports/index.js';
+import type { ConfigStore, FactStore, LogStore, ObjectStore, SecretStore } from '../../src/application/ports/index.js';
 import { defaultConfig, setConfigValue, type Config } from '../../src/domain/config/config.js';
 import { FactBase } from '../../src/domain/facts/fact-base.js';
 import { nextEntry, verifyChain } from '../../src/domain/log/chain.js';
@@ -100,6 +100,24 @@ export function configStoreContract(name: string, create: Factory<ConfigStore>):
       const config: Config = changed.ok ? { ...changed.value, version: 2 } : defaultConfig();
       await store.save(config);
       expect(await store.load()).toEqual(config);
+    });
+  });
+}
+
+export function secretStoreContract(name: string, create: Factory<SecretStore>): void {
+  describe(`SecretStore contract: ${name}`, () => {
+    it('has no key until one is created, then always returns the same 32 bytes', async () => {
+      const store = await create();
+      expect(await store.load()).toBeUndefined();
+      const key = await store.loadOrCreate();
+      expect(key).toHaveLength(32);
+      expect(await store.loadOrCreate()).toEqual(key);
+      expect(await store.load()).toEqual(key);
+    });
+
+    it('does not hand out an all-zero key', async () => {
+      const key = await (await create()).loadOrCreate();
+      expect(key.some((b) => b !== 0)).toBe(true);
     });
   });
 }

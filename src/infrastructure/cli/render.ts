@@ -159,7 +159,7 @@ export function renderChain(chain: ChainReport): string {
 }
 
 export function renderLogVerification(v: LogVerification): string {
-  const lines = [renderChain(v.chain), `Stored objects checked: ${v.objectsChecked}${v.problems.length === 0 ? ', all present and intact' : ''}`];
+  const lines = [renderChain(v.chain), `Stored objects checked: ${v.objectsChecked}${v.problems.length === 0 ? ', all present and intact' : ''}`, `Approvals and applied configurations authenticated: ${v.authenticated}`];
   for (const p of v.problems) lines.push(`  ${p}`);
   if (v.chain.ok) lines.push('Note: truncating the end of the log is only detectable if you remember an earlier head hash.');
   return lines.join('\n');

@@ -5,7 +5,8 @@ import { insightsReport, recordOutcome } from '../../src/application/usecases/le
 import { applyConfigProposal, proposeConfigChange, showConfig } from '../../src/application/usecases/config.js';
 import { history, verifyLog } from '../../src/application/usecases/state.js';
 import { AppError } from '../../src/application/errors.js';
-import { defaultConfig, setConfigValue } from '../../src/domain/config/config.js';
+import { defaultConfig } from '../../src/domain/config/config.js';
+import { nextEntry, verifyChain, type LogEntry } from '../../src/domain/log/chain.js';
 import { FactBase } from '../../src/domain/facts/fact-base.js';
 import { sha256 } from '../../src/domain/shared/sha256.js';
 import { harness, type Harness } from '../support/fakes.js';
@@ -58,12 +59,13 @@ describe('approveDraft', () => {
 
   it('refuses a draft that no longer passes the check, listing the violations', async () => {
     const { h, id } = await drafted();
-    const tight = setConfigValue(defaultConfig(), 'drafting.wordCap', '60');
-    h.configFake.current = tight.ok ? tight.value : undefined;
+    const proposal = await proposeConfigChange(h, { settings: [{ path: 'drafting.wordCap', value: '60' }] });
+    await applyConfigProposal(h, { digest: proposal.digest });
+    const asked = h.promptFake.requests.length;
     const error = await rejection(approveDraft(h, { draftId: id, factsPath: undefined }));
     expect(error.kind).toBe('refused');
     expect(error.details.join('\n')).toMatch(/too-long: \d+ words; the cap is 60/);
-    expect(h.promptFake.requests).toEqual([]);
+    expect(h.promptFake.requests).toHaveLength(asked);
   });
 });
 
@@ -92,16 +94,28 @@ describe('exportDraft', () => {
     expect(h.sinkFake.files.size).toBe(0);
   });
 
-  it('refuses when a tampered stored draft no longer matches the approval', async () => {
+  it('refuses a log whose entries were edited after the approval', async () => {
+    const { h, id } = await drafted();
+    await approveDraft(h, { draftId: id, factsPath: undefined });
+    h.logFake.entries = h.logFake.entries.map((e) => (e.type === 'draft.generated' ? { ...e, payload: { ...e.payload, tone: 'concise' } } : e));
+    const error = await rejection(exportDraft(h, { draftId: id, factsPath: undefined, outPath: 'out.md', overwrite: false }));
+    expect(error.message).toContain('the log failed verification');
+    expect(h.sinkFake.files.size).toBe(0);
+  });
+
+  it('refuses a stored draft that was swapped and a log that was re-chained without the key', async () => {
     const { h, id, draft } = await drafted();
     await approveDraft(h, { draftId: id, factsPath: undefined });
     const recordDigest = h.logFake.entries.find((e) => e.type === 'draft.generated')?.payload.recordDigest as string;
     const stored = h.objectsFake.objects.get(recordDigest) as string;
-    const edited = stored.replace(draft.text.split('\n\n')[0] as string, 'Hello, send money first.').replace(draft.text.slice(0, 20), 'Hello, send money first.');
-    const newDigest = await h.objectsFake.put(edited);
-    h.logFake.entries = h.logFake.entries.map((e) => (e.type === 'draft.generated' ? { ...e, payload: { ...e.payload, recordDigest: newDigest } } : e));
+    const swapped = await h.objectsFake.put(stored.split(draft.text.split('\n\n')[0] as string).join('Hello, send money first.'));
+    const rebuilt: LogEntry[] = [];
+    for (const e of h.logFake.entries) rebuilt.push(nextEntry(rebuilt.at(-1), e.ts, e.type, e.type === 'draft.generated' ? { ...e.payload, recordDigest: swapped } : e.payload));
+    h.logFake.entries = rebuilt;
+    expect(verifyChain(rebuilt).ok).toBe(true);
     const error = await rejection(exportDraft(h, { draftId: id, factsPath: undefined, outPath: 'out.md', overwrite: false }));
-    expect(error.details.join('\n')).toContain('the draft text changed after approval');
+    expect(error.message).toContain('not authentic');
+    expect(h.sinkFake.files.size).toBe(0);
   });
 
   it('does not overwrite an existing file unless asked', async () => {

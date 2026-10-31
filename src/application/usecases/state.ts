@@ -1,3 +1,4 @@
+import { verifyEntryMac, isAuthenticatedType } from '../../domain/log/auth.js';
 import { verifyChain, type ChainReport, type LogEntry } from '../../domain/log/chain.js';
 import { AppError } from '../errors.js';
 import type { Deps } from '../ports/index.js';
@@ -50,6 +51,8 @@ export interface LogVerification {
   /** Objects referenced by the log that are missing or no longer match their digest. */
   readonly problems: readonly string[];
   readonly objectsChecked: number;
+  /** Approval and configuration entries whose keyed MAC was checked. */
+  readonly authenticated: number;
 }
 
 const OBJECT_KEYS = ['jobDigest', 'recordDigest', 'objectDigest', 'editedTextDigest'] as const;
@@ -73,5 +76,13 @@ export async function verifyLog(deps: Deps): Promise<LogVerification> {
       }
     }
   }
-  return { chain, problems, objectsChecked: seen.size };
+  const sensitive = entries.filter((e) => isAuthenticatedType(e.type));
+  if (sensitive.length > 0) {
+    const key = await deps.secrets.load();
+    if (key === undefined) problems.push('secret.key is missing: approvals and applied configurations cannot be authenticated');
+    else {
+      for (const entry of sensitive) if (!verifyEntryMac(key, entry)) problems.push(`entry ${entry.seq}: the ${entry.type} record is not authentic (wrong or missing MAC)`);
+    }
+  }
+  return { chain, problems, objectsChecked: seen.size, authenticated: sensitive.length };
 }

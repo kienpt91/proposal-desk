@@ -16,6 +16,7 @@ import type {
   LogStore,
   ObjectStore,
   Prompt,
+  SecretStore,
 } from '../../src/application/ports/index.js';
 
 /** A clock that only moves when a test says so. */
@@ -73,6 +74,20 @@ export class InMemoryConfigStore implements ConfigStore {
   }
 }
 
+/** A fixed or generated key; `key` is undefined until something needs it. */
+export class InMemorySecretStore implements SecretStore {
+  constructor(public key: Uint8Array | undefined = undefined) {}
+
+  async load(): Promise<Uint8Array | undefined> {
+    return this.key;
+  }
+
+  async loadOrCreate(): Promise<Uint8Array> {
+    this.key ??= new Uint8Array(32).map((_, i) => (i * 7 + 13) % 256);
+    return this.key;
+  }
+}
+
 export class InMemoryFactStore implements FactStore {
   constructor(
     public base: FactBase | undefined = undefined,
@@ -123,6 +138,7 @@ export interface Harness extends Deps {
   readonly logFake: InMemoryLogStore;
   readonly objectsFake: InMemoryObjectStore;
   readonly configFake: InMemoryConfigStore;
+  readonly secretsFake: InMemorySecretStore;
   readonly promptFake: ScriptedPrompt;
   readonly sinkFake: MemorySink;
   readonly factStore: InMemoryFactStore;
@@ -135,6 +151,7 @@ export function harness(options: { readonly facts?: FactBase; readonly config?: 
   const log = new InMemoryLogStore();
   const objects = new InMemoryObjectStore();
   const config = new InMemoryConfigStore(options.config);
+  const secrets = new InMemorySecretStore();
   const prompt = new ScriptedPrompt();
   const sink = new MemorySink();
   const factStore = new InMemoryFactStore(options.facts);
@@ -145,6 +162,7 @@ export function harness(options: { readonly facts?: FactBase; readonly config?: 
     log,
     objects,
     config,
+    secrets,
     prompt,
     sink,
     facts: () => handle,
@@ -152,6 +170,7 @@ export function harness(options: { readonly facts?: FactBase; readonly config?: 
     logFake: log,
     objectsFake: objects,
     configFake: config,
+    secretsFake: secrets,
     promptFake: prompt,
     sinkFake: sink,
     factStore,

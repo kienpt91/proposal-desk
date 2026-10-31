@@ -8,8 +8,9 @@ import { FactBase } from '../../src/domain/facts/fact-base.js';
 import { sha256 } from '../../src/domain/shared/sha256.js';
 import { FileConfigStore, FileFactStore, FileLogStore, FileObjectStore, FsEvidenceChecker, FsFileSink } from '../../src/infrastructure/fs/stores.js';
 import { ensurePrivateDir, readText, readTextIfExists, SIZE_LIMITS, STATE_FILE, writeTextAtomic } from '../../src/infrastructure/fs/safe-fs.js';
-import { configStoreContract, factStoreContract, logStoreContract, objectStoreContract } from '../contracts/ports.js';
-import { InMemoryConfigStore, InMemoryFactStore, InMemoryLogStore, InMemoryObjectStore } from '../support/fakes.js';
+import { configStoreContract, factStoreContract, logStoreContract, objectStoreContract, secretStoreContract } from '../contracts/ports.js';
+import { FileSecretStore } from '../../src/infrastructure/fs/secret-store.js';
+import { InMemoryConfigStore, InMemoryFactStore, InMemoryLogStore, InMemoryObjectStore, InMemorySecretStore } from '../support/fakes.js';
 import { fact } from '../support/builders.js';
 
 const roots: string[] = [];
@@ -34,6 +35,8 @@ objectStoreContract('files', async () => new FileObjectStore(join(await stateDir
 factStoreContract('in memory', () => new InMemoryFactStore());
 factStoreContract('file', async () => new FileFactStore(join(await stateDir(), 'facts.json'), STATE_FILE));
 configStoreContract('in memory', () => new InMemoryConfigStore());
+secretStoreContract('in memory', () => new InMemorySecretStore());
+secretStoreContract('file', async () => new FileSecretStore(await stateDir()));
 configStoreContract('file', async () => new FileConfigStore(join(await stateDir(), 'config.json')));
 
 async function rejection(promise: Promise<unknown>): Promise<AppError> {
@@ -185,6 +188,43 @@ describe('FileFactStore', () => {
     const path = join(tmp(), 'new-facts.json');
     await new FileFactStore(path).save(FactBase.empty());
     expect(statSync(path).mode & 0o777).toBe(0o600);
+  });
+});
+
+describe('FileSecretStore', () => {
+  it('creates a private 64-hex-character key file once and refuses malformed, open or linked key files', async () => {
+    const dir = await stateDir();
+    const store = new FileSecretStore(dir);
+    const key = await store.loadOrCreate();
+    const file = join(dir, 'secret.key');
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+    expect(readFileSync(file, 'utf8')).toMatch(/^[0-9a-f]{64}\n$/);
+    expect(await new FileSecretStore(dir).loadOrCreate()).toEqual(key);
+    writeFileSync(file, 'nope\n', { mode: 0o600 });
+    expect((await rejection(store.load())).message).toContain('is malformed');
+    writeFileSync(file, `${'ab'.repeat(32)}\n`, { mode: 0o600 });
+    chmodSync(file, 0o644);
+    expect((await rejection(store.load())).message).toContain('accessible by other users');
+    chmodSync(file, 0o600);
+    expect(await store.load()).toEqual(new Uint8Array(32).fill(0xab));
+  });
+
+  it('creates the state directory when it does not exist yet, and refuses a symbolic link as key file', async () => {
+    const root = tmp();
+    const store = new FileSecretStore(join(root, 'new-state'));
+    expect(await store.load()).toBeUndefined();
+    await store.loadOrCreate();
+    expect(statSync(join(root, 'new-state')).mode & 0o777).toBe(0o700);
+    const dir = await stateDir();
+    writeFileSync(join(dir, 'real.key'), `${'cd'.repeat(32)}\n`, { mode: 0o600 });
+    symlinkSync(join(dir, 'real.key'), join(dir, 'secret.key'));
+    expect((await rejection(new FileSecretStore(dir).load())).message).toContain('symbolic link');
+  });
+
+  it('two processes racing to create the key end up with the same key', async () => {
+    const dir = await stateDir();
+    const keys = await Promise.all(Array.from({ length: 8 }, () => new FileSecretStore(dir).loadOrCreate()));
+    for (const key of keys) expect(key).toEqual(keys[0]);
   });
 });
 

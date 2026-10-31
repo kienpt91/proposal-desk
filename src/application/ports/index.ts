@@ -44,6 +44,14 @@ export interface ConfigStore {
   save(config: Config): Promise<void>;
 }
 
+/** The per-state-directory secret that authenticates approvals and applied configurations. It is never printed or logged. */
+export interface SecretStore {
+  /** The key, or undefined when none exists yet. Throws AppError when a key file exists but is unusable. */
+  load(): Promise<Uint8Array | undefined>;
+  /** The key, created from secure randomness (private file) when absent. */
+  loadOrCreate(): Promise<Uint8Array>;
+}
+
 export interface ConfirmRequest {
   readonly title: string;
   /** Lines shown to the human before the question. Untrusted text is escaped by the adapter. */
@@ -72,6 +80,7 @@ export interface Deps {
   readonly log: LogStore;
   readonly objects: ObjectStore;
   readonly config: ConfigStore;
+  readonly secrets: SecretStore;
   readonly prompt: Prompt;
   readonly sink: FileSink;
   /** Opens the facts file at `path`, or the default location (in the state directory) when undefined. */

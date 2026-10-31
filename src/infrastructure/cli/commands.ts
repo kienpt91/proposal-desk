@@ -274,9 +274,12 @@ export const COMMANDS: readonly Command[] = [
     flags: [JSON_FLAG],
     run: async ({ args, out, deps }) => {
       const result = await showConfig(deps);
-      if (flagBool(args, 'json')) out.json({ ...result.config, digest: result.digest, isDefault: result.isDefault });
-      else out.out(renderConfig(result.config, result.digest, result.isDefault));
-      return 0;
+      if (flagBool(args, 'json')) out.json({ ...result.config, digest: result.digest, isDefault: result.isDefault, ...(result.problem === undefined ? {} : { problem: result.problem }) });
+      else {
+        if (result.problem !== undefined) out.err(`WARNING: this configuration is NOT trusted and is ignored by every other command: ${result.problem}`);
+        out.out(renderConfig(result.config, result.digest, result.isDefault));
+      }
+      return result.problem === undefined ? 0 : 1;
     },
   },
   {

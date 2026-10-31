@@ -5,9 +5,10 @@ import type { JobPosting } from '../../domain/job/posting.js';
 import { bindingDigest, checkApproval, newApproval, type Approval, type ApprovalBinding } from '../../domain/log/approval.js';
 import { reviewNotes, type Draft } from '../../domain/proposal/draft.js';
 import { proposalBody, verifyProposal, type CheckReport, type Violation } from '../../domain/proposal/verify.js';
+import type { LogEntry } from '../../domain/log/chain.js';
 import { sha256 } from '../../domain/shared/sha256.js';
 import { AppError } from '../errors.js';
-import { loadConfig, record, requireFacts, storeObject } from '../context.js';
+import { loadConfig, readVerifiedLog, record, recordAuthenticated, requireAuthentic, requireFacts, storeObject } from '../context.js';
 import { findDraft, type FoundDraft } from '../drafts.js';
 import type { Deps } from '../ports/index.js';
 import { parseJobOrThrow } from './analysis.js';
@@ -98,7 +99,7 @@ export async function approveDraft(deps: Deps, input: ApproveInput): Promise<App
   if (!confirmed) throw new AppError('refused', 'approval was not given');
   if (edited) await storeObject(deps, text);
   const approval = newApproval(draft.id, binding, deps.clock.now());
-  await record(deps, 'draft.approved', {
+  await recordAuthenticated(deps, 'draft.approved', {
     draftId: draft.id,
     textDigest: approval.textDigest,
     jobDigest: approval.jobDigest,
@@ -111,16 +112,18 @@ export async function approveDraft(deps: Deps, input: ApproveInput): Promise<App
 }
 
 interface StoredApproval {
+  readonly entry: LogEntry;
   readonly approval: Approval;
   /** Present when the approved text is a hand-edited version kept in the object store. */
   readonly editedTextDigest: string | undefined;
 }
 
-async function latestApproval(deps: Deps, draftId: string): Promise<StoredApproval | undefined> {
-  const entry = (await deps.log.readAll()).filter((e) => e.type === 'draft.approved' && e.payload.draftId === draftId).at(-1);
+function latestApproval(entries: readonly LogEntry[], draftId: string): StoredApproval | undefined {
+  const entry = entries.filter((e) => e.type === 'draft.approved' && e.payload.draftId === draftId).at(-1);
   if (entry === undefined) return undefined;
   const p = entry.payload;
   return {
+    entry,
     approval: {
       draftId,
       textDigest: p.textDigest as string,
@@ -146,7 +149,9 @@ export async function exportDraft(
   input: { readonly draftId: string; readonly factsPath: string | undefined; readonly outPath: string; readonly overwrite: boolean },
 ): Promise<ExportResult> {
   const ctx = await load(deps, input.draftId, input.factsPath);
-  const stored = await latestApproval(deps, ctx.draft.id);
+  const entries = await readVerifiedLog(deps);
+  const stored = latestApproval(entries, ctx.draft.id);
+  if (stored !== undefined) await requireAuthentic(deps, stored.entry, `the approval of draft ${ctx.draft.id}`);
   let text = ctx.draft.text;
   if (stored?.editedTextDigest !== undefined) {
     const editedText = await deps.objects.get(stored.editedTextDigest);

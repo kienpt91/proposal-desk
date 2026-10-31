@@ -3,13 +3,13 @@ import { checkProposalApplies, proposalDigest, proposeConfig, type ConfigProposa
 import { canonicalJson, type Json } from '../../domain/shared/canonical-json.js';
 import { stripUnsafe } from '../../domain/shared/text-safety.js';
 import { AppError } from '../errors.js';
-import { loadConfig, record, resolveId, storeObject } from '../context.js';
+import { inspectConfig, loadConfig, record, recordAuthenticated, resolveId, storeObject } from '../context.js';
 import type { Deps } from '../ports/index.js';
 
-export async function showConfig(deps: Deps): Promise<{ readonly config: Config; readonly digest: string; readonly isDefault: boolean }> {
+export async function showConfig(deps: Deps): Promise<{ readonly config: Config; readonly digest: string; readonly isDefault: boolean; readonly problem: string | undefined }> {
   const stored = await deps.config.load();
-  const config = await loadConfig(deps);
-  return { config, digest: configDigest(config), isDefault: stored === undefined };
+  const status = await inspectConfig(deps);
+  return { config: status.config, digest: configDigest(status.config), isDefault: stored === undefined, problem: status.problem };
 }
 
 /** Writes a proposal down (in the log and the object store) without changing anything. A human applies it later. */
@@ -80,6 +80,6 @@ export async function applyConfigProposal(deps: Deps, input: { readonly digest: 
   });
   if (!confirmed) throw new AppError('refused', 'the proposal was not applied');
   await deps.config.save(applicable.value);
-  await record(deps, 'config.applied', { proposalDigest: proposal.digest, version: applicable.value.version, configDigest: configDigest(applicable.value) });
+  await recordAuthenticated(deps, 'config.applied', { proposalDigest: proposal.digest, version: applicable.value.version, configDigest: configDigest(applicable.value) });
   return { proposal, changes };
 }

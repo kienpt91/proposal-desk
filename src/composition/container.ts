@@ -2,6 +2,7 @@ import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import type { Clock, Deps, FactsHandle, Prompt } from '../application/ports/index.js';
 import { ensurePrivateDir, STATE_FILE, USER_FILE } from '../infrastructure/fs/safe-fs.js';
+import { FileSecretStore } from '../infrastructure/fs/secret-store.js';
 import { FileConfigStore, FileFactStore, FileLogStore, FileObjectStore, FsEvidenceChecker, FsFileSink } from '../infrastructure/fs/stores.js';
 import { TtyPrompt, type TerminalStreams } from '../infrastructure/prompt/tty-prompt.js';
 
@@ -39,6 +40,7 @@ export async function createDeps(options: ContainerOptions): Promise<Deps> {
     log: new FileLogStore(stateDir),
     objects: new FileObjectStore(join(stateDir, 'objects')),
     config: new FileConfigStore(join(stateDir, 'config.json')),
+    secrets: new FileSecretStore(stateDir),
     prompt: options.prompt ?? new TtyPrompt(options.terminal),
     sink: new FsFileSink(),
     facts(path: string | undefined): FactsHandle {

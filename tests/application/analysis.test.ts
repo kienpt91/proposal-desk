@@ -3,7 +3,8 @@ import { analyzeJobText, checkProposalText, draftFromJob, parseJobOrThrow } from
 import { findDraft } from '../../src/application/drafts.js';
 import { parseStoredDraft, serializeStoredDraft, toInsightRecord, toStoredDraft } from '../../src/application/records.js';
 import { AppError } from '../../src/application/errors.js';
-import { setConfigValue, type Config } from '../../src/domain/config/config.js';
+import { defaultConfig, setConfigValue, type Config } from '../../src/domain/config/config.js';
+import { applyConfigProposal, proposeConfigChange, showConfig } from '../../src/application/usecases/config.js';
 import { FactBase } from '../../src/domain/facts/fact-base.js';
 import { sha256 } from '../../src/domain/shared/sha256.js';
 import { harness } from '../support/fakes.js';
@@ -35,12 +36,38 @@ describe('analyzeJobText', () => {
     });
   });
 
-  it('uses the stored configuration', async () => {
-    const config = (setConfigValue((await import('../../src/domain/config/config.js')).defaultConfig(), 'scoring.applyThreshold', '95') as { value: Config }).value;
-    const h = harness({ facts: exampleFacts(), config });
+  it('uses the configuration a human applied, and refuses one edited by hand', async () => {
+    const h = setup();
+    const proposal = await proposeConfigChange(h, { settings: [{ path: 'scoring.applyThreshold', value: '95' }] });
+    await applyConfigProposal(h, { digest: proposal.digest });
     const result = await analyzeJobText(h, { jobText: EXAMPLE_JOB, factsPath: undefined });
-    expect(result.analysis.configVersion).toBe(1);
+    expect(result.analysis.configVersion).toBe(2);
     expect(result.analysis.verdict.reasons[0]).toContain('below the apply threshold 95');
+
+    const edited = (setConfigValue(h.configFake.current as Config, 'scoring.applyThreshold', '96') as { value: Config }).value;
+    h.configFake.current = edited;
+    const error = await rejection(analyzeJobText(h, { jobText: EXAMPLE_JOB, factsPath: undefined }));
+    expect(error).toMatchObject({ kind: 'refused' });
+    expect(error.message).toContain('does not match configuration version 2');
+    expect(await showConfig(h)).toMatchObject({ problem: expect.stringContaining('does not match configuration version 2') });
+  });
+
+  it('refuses a configuration file that differs from the defaults when nothing was ever applied', async () => {
+    const edited = (setConfigValue(defaultConfig(), 'scoring.applyThreshold', '80') as { value: Config }).value;
+    const h = harness({ facts: exampleFacts(), config: edited });
+    expect((await rejection(analyzeJobText(h, { jobText: EXAMPLE_JOB, factsPath: undefined }))).message).toContain('no configuration was ever applied');
+    h.configFake.current = defaultConfig();
+    expect((await analyzeJobText(h, { jobText: EXAMPLE_JOB, factsPath: undefined })).analysis.configVersion).toBe(1);
+  });
+
+  it('refuses a configuration whose applied record is not authentic or whose key is gone', async () => {
+    const h = setup();
+    const proposal = await proposeConfigChange(h, { settings: [{ path: 'scoring.applyThreshold', value: '95' }] });
+    await applyConfigProposal(h, { digest: proposal.digest });
+    h.secretsFake.key = undefined;
+    expect((await rejection(analyzeJobText(h, { jobText: EXAMPLE_JOB, factsPath: undefined }))).message).toContain('no secret.key');
+    h.secretsFake.key = new Uint8Array(32).fill(9);
+    expect((await rejection(analyzeJobText(h, { jobText: EXAMPLE_JOB, factsPath: undefined }))).message).toContain('not authentic');
   });
 
   it('rejects empty text and a missing facts file with helpful messages', async () => {
