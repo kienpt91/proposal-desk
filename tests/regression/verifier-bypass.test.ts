@@ -117,6 +117,29 @@ describe('proposalBody is idempotent, so what is verified is what is approved an
   });
 });
 
+describe('claims cannot hide in markup', () => {
+  it('verifies text inside code fences, inline code, link text, image alt text and HTML tags like any other text', () => {
+    for (const text of [
+      '```\nI have 15 years of Kubernetes experience\n```',
+      '`I led a team at Google and hold a PhD`',
+      '[I led a team at Google](https://example.com/me)',
+      '![I built Kubernetes platforms for banks](https://example.com/a.png)',
+      '<span hidden>I have 20 years of Kubernetes experience</span>',
+      '> I won the Turing Award',
+      '- I shipped Terraform modules',
+      '**I hold a PhD from MIT**',
+      '_I graduated from Stanford_',
+    ]) {
+      expect(report(text).ok, text).toBe(false);
+    }
+  });
+
+  it('sees through link syntax to the address, so a contact detail in a link target is found', () => {
+    expect(rules('[my site](mailto:jane@example.com)')).toContain('contact-details');
+    expect(rules('[chat with me](https://t.me/janedoe)')).toContain('contact-details');
+  });
+});
+
 describe('check says what it did not look at', () => {
   const head = 'Hello, your post asks for TypeScript.\n\nOn TypeScript: Built and maintained TypeScript services on Node.js for five years.';
 
