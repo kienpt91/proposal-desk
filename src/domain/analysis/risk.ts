@@ -202,10 +202,21 @@ function allSentences(body: string): string[] {
 
 const NEGATION_BEFORE = /\b(?:no|not|without|never|don't|do not|doesn't|does not|isn't|aren't|won't|will not|nor|neither|avoid|paid)\s+(?:\w+\s+){0,3}$/i;
 
+const GLOBAL_VARIANTS = new WeakMap<RegExp, RegExp>();
+
+function globally(pattern: RegExp): RegExp {
+  let re = GLOBAL_VARIANTS.get(pattern);
+  if (re === undefined) {
+    re = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
+    GLOBAL_VARIANTS.set(pattern, re);
+  }
+  return re;
+}
+
 /** First sentence where `pattern` matches outside a negation ("no rush", "paid trial"). */
 function firstMatch(sentences: readonly string[], pattern: RegExp): string | undefined {
+  const re = globally(pattern);
   for (const sentence of sentences) {
-    const re = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
     for (const m of sentence.matchAll(re)) {
       if (!NEGATION_BEFORE.test(sentence.slice(Math.max(0, (m.index ?? 0) - 30), m.index ?? 0))) return sentence;
     }

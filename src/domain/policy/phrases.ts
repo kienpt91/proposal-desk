@@ -91,14 +91,20 @@ function escapeForRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+const PHRASE_PATTERNS = new Map<string, RegExp>();
+
+function patternFor(phrase: string): RegExp {
+  let re = PHRASE_PATTERNS.get(phrase);
+  if (re === undefined) {
+    re = new RegExp(`(?<![A-Za-z0-9])${escapeForRegex(phrase)}(?![A-Za-z0-9])`, 'i');
+    PHRASE_PATTERNS.set(phrase, re);
+  }
+  return re;
+}
+
 /** Returns the phrases from `list` found in `text` (each at most once), in list order. */
 export function findPhrases(text: string, list: readonly string[]): string[] {
-  const out: string[] = [];
-  for (const phrase of list) {
-    const re = new RegExp(`(?<![A-Za-z0-9])${escapeForRegex(phrase)}(?![A-Za-z0-9])`, 'i');
-    if (re.test(text)) out.push(phrase);
-  }
-  return out;
+  return list.filter((phrase) => patternFor(phrase).test(text));
 }
 
 /** Returns the excerpt of the first automation directive found, or undefined. */

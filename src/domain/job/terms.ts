@@ -44,29 +44,39 @@ function typeOf(unit: string | undefined, sentence: string): PayType {
 /** The first money mention that sits in a pay-related sentence. Currency symbols default to USD. */
 export function extractBudget(sentences: readonly Sentence[]): Budget | undefined {
   for (const sentence of sentences) {
-    const candidates: { index: number; budget: Budget }[] = [];
-    for (const m of sentence.text.matchAll(PREFIXED)) {
-      const min = scaled(m[2] as string, m[3]);
-      const max = m[4] === undefined ? min : scaled(m[4], m[5]);
-      candidates.push({
-        index: m.index ?? 0,
-        budget: { type: typeOf(m[6], sentence.text), min: Math.min(min, max), max: Math.max(min, max), currency: currencyOf(m[1] as string), excerpt: truncate(m[0].trim(), 80) },
-      });
-    }
-    for (const m of sentence.text.matchAll(SUFFIXED)) {
-      const min = scaled(m[1] as string, m[2]);
-      const max = m[3] === undefined ? min : scaled(m[3], m[4]);
-      candidates.push({
-        index: m.index ?? 0,
-        budget: { type: typeOf(m[6], sentence.text), min: Math.min(min, max), max: Math.max(min, max), currency: currencyOf(m[5] as string), excerpt: truncate(m[0].trim(), 80) },
-      });
-    }
-    candidates.sort((a, b) => a.index - b.index);
-    for (const { budget } of candidates) {
-      if (budget.max > 0 && (BUDGET_CONTEXT.test(sentence.text) || budget.type === 'hourly')) return budget;
+    for (const money of findMoney(sentence.text)) {
+      const type = typeOf(money.unit, sentence.text);
+      if (money.max > 0 && (BUDGET_CONTEXT.test(sentence.text) || type === 'hourly')) {
+        return { type, min: money.min, max: money.max, currency: money.currency, excerpt: truncate(money.excerpt, 80) };
+      }
     }
   }
   return undefined;
+}
+
+export interface Money {
+  readonly min: number;
+  readonly max: number;
+  readonly currency: string;
+  readonly unit: string | undefined;
+  readonly index: number;
+  readonly excerpt: string;
+}
+
+/** Every money mention in `text`, in reading order ("$40", "30-50 EUR/hr", "£2.5k"). */
+export function findMoney(text: string): Money[] {
+  const out: Money[] = [];
+  for (const m of text.matchAll(PREFIXED)) {
+    const min = scaled(m[2] as string, m[3]);
+    const max = m[4] === undefined ? min : scaled(m[4], m[5]);
+    out.push({ min: Math.min(min, max), max: Math.max(min, max), currency: currencyOf(m[1] as string), unit: m[6]?.toLowerCase(), index: m.index ?? 0, excerpt: m[0].trim() });
+  }
+  for (const m of text.matchAll(SUFFIXED)) {
+    const min = scaled(m[1] as string, m[2]);
+    const max = m[3] === undefined ? min : scaled(m[3], m[4]);
+    out.push({ min: Math.min(min, max), max: Math.max(min, max), currency: currencyOf(m[5] as string), unit: m[6]?.toLowerCase(), index: m.index ?? 0, excerpt: m[0].trim() });
+  }
+  return out.sort((a, b) => a.index - b.index);
 }
 
 // ---------------------------------------------------------------- duration
