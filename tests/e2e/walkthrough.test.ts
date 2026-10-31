@@ -36,7 +36,8 @@ describe('walkthrough with the shipped example', () => {
 
     const check = await s.run(['check', join(s.dir, 'draft.md'), '--job', s.job, '--facts', s.facts]);
     expect(check.code).toBe(0);
-    expect(check.stdout).toContain('Check: PASSED (0 errors, 0 warnings)');
+    expect(check.stdout).toContain('Check: PASSED (0 errors, 1 warning)');
+    expect(check.stdout).toContain('unchecked-review-notes');
 
     const blocked = await s.run(['export', id, '--out', join(s.dir, 'final.md'), '--facts', s.facts]);
     expect(blocked.code).toBe(1);

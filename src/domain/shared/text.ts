@@ -37,8 +37,10 @@ export function splitSentences(text: string): string[] {
   for (const line of text.split('\n')) {
     const trimmed = line.trim();
     if (trimmed === '') continue;
-    const protectedLine = trimmed.replace(/\b(e\.g|i\.e|etc|vs|approx)\./gi, (m) => m.replace(/\./g, '\u0000'));
-    const parts = protectedLine.split(/(?<=[.!?])\s+(?=[A-Z0-9"'(\[])/);
+    const protectedLine = trimmed
+      .replace(/\b(?:[A-Za-z]\.){2,}/g, (m) => m.replace(/\./g, '\u0000')) // U.S., e.g., i.e., a.m.
+      .replace(/\b(etc|vs|approx|dr|mr|ms|mrs|inc|ltd)\.(?=\s)/gi, (m) => m.replace(/\./g, '\u0000'));
+    const parts = protectedLine.split(/(?<=[.!?])\s+/);
     for (const part of parts) {
       const sentence = part.replace(/\u0000/g, '.').trim();
       if (sentence !== '') out.push(sentence);

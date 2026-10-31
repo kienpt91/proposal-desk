@@ -4,7 +4,8 @@ import type { FactBase } from '../../domain/facts/fact-base.js';
 import type { JobPosting } from '../../domain/job/posting.js';
 import { bindingDigest, checkApproval, newApproval, type Approval, type ApprovalBinding } from '../../domain/log/approval.js';
 import { reviewNotes, type Draft } from '../../domain/proposal/draft.js';
-import { proposalBody, verifyProposal, type CheckReport, type Violation } from '../../domain/proposal/verify.js';
+import { proposalParts } from '../../domain/proposal/markup.js';
+import { verifyProposal, type CheckReport, type Violation } from '../../domain/proposal/verify.js';
 import type { LogEntry } from '../../domain/log/chain.js';
 import { sha256 } from '../../domain/shared/sha256.js';
 import { AppError } from '../errors.js';
@@ -77,7 +78,9 @@ export async function approveDraft(deps: Deps, input: ApproveInput): Promise<App
   if (ctx.currentFactsDigest !== draft.factsDigest) {
     throw new AppError('refused', `the facts cited by draft ${draft.id} changed since it was written`, [...ctx.notices, 'Run `draft` again so the proposal reflects the current facts.']);
   }
-  const editedText = input.editedMarkdown === undefined ? undefined : proposalBody(input.editedMarkdown);
+  const parts = input.editedMarkdown === undefined ? undefined : proposalParts(input.editedMarkdown);
+  if (parts !== undefined && !parts.stable) throw new AppError('refused', 'the edited text cannot be pinned down: its markup keeps changing it when it is read again');
+  const editedText = parts?.body;
   if (editedText === '') throw new AppError('invalid', 'the edited text is empty');
   const edited = editedText !== undefined && editedText !== draft.text;
   const text = edited ? editedText : draft.text;
