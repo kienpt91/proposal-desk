@@ -84,7 +84,7 @@ export class FactBase {
   }
 
   markStale(id: string, reason: string): Change<FactBase> {
-    const fact = this.require(id);
+    const fact = this.mustGet(id);
     if (fact.status === 'stale') return { value: this, events: [] };
     return this.replace(id, (f) => ({ ...f, status: 'stale' }), { type: 'fact.marked-stale', factId: id, reason });
   }
@@ -112,14 +112,14 @@ export class FactBase {
     return digestOf(sorted.map((id) => snapshotOf(this.get(id), id)));
   }
 
-  private require(id: string): Fact {
+  private mustGet(id: string): Fact {
     const fact = this.get(id);
     if (fact === undefined) throw new DomainError('unknown-fact', `no fact with id ${id}`);
     return fact;
   }
 
   private replace(id: string, update: (fact: Fact) => Fact, event: FactEvent): Change<FactBase> {
-    this.require(id);
+    this.mustGet(id);
     const facts = this.facts.map((f) => (f.id === id ? update(f) : f));
     const next = FactBase.fromFacts(facts);
     if (!next.ok) throw new DomainError('fact-rejected', next.error.join('; '));
