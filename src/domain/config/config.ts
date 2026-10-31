@@ -272,20 +272,20 @@ export function diffConfig(before: Config, after: Config): ConfigChange[] {
 export function setConfigValue(config: Config, path: string, value: string): Result<Config> {
   const parts = path.split('.');
   const clone = JSON.parse(JSON.stringify(config)) as Record<string, unknown>;
-  let cursor: Record<string, unknown> = clone;
+  let target: Record<string, unknown> = clone;
   for (const part of parts.slice(0, -1)) {
-    const next = cursor[part];
+    const next = target[part];
     if (typeof next !== 'object' || next === null) return fail([`${path}: unknown setting`]);
-    cursor = next as Record<string, unknown>;
+    target = next as Record<string, unknown>;
   }
   const last = parts[parts.length - 1] as string;
-  const current = cursor[last];
+  const current = target[last];
   if (path === 'version' || path === 'schema' || (typeof current !== 'number' && typeof current !== 'string')) return fail([`${path}: unknown or read-only setting`]);
   if (typeof current === 'number') {
     if (!/^-?\d+(?:\.\d+)?$/.test(value.trim())) return fail([`${path}: expected a number`]);
-    cursor[last] = Number(value);
+    target[last] = Number(value);
   } else {
-    cursor[last] = value;
+    target[last] = value;
   }
   return parseConfig(clone);
 }

@@ -128,7 +128,7 @@ const ENTRIES: readonly TechEntry[] = [
   t('pandas', 'pandas', 'library', 'data', ['pandas', 'numpy', 'data wrangling'], { related: ['python'] }),
   t('dataengineering', 'Data engineering', 'practice', 'data', ['etl', 'elt', 'data pipeline', 'data pipelines', 'airflow', 'dbt', 'spark', 'data warehouse'], { related: ['sql', 'python'] }),
   t('ml', 'Machine learning', 'practice', 'ml', ['machine learning', 'deep learning', 'tensorflow', 'pytorch', 'scikit-learn', 'sklearn', 'neural network', 'neural networks'], { related: ['python'] }),
-  t('llm', 'LLM applications', 'practice', 'ml', ['llm', 'llms', 'large language model', 'large language models', 'rag pipeline', 'prompt engineering', 'langchain', 'vector database', 'embeddings'], { related: ['python', 'ml'] }),
+  t('llm', 'LLM applications', 'practice', 'ml', ['llm', 'llms', 'large language model', 'large language models', 'rag pipeline', 'prompt engineering', 'vector database', 'embeddings'], { related: ['python', 'ml'] }),
   t('nlp', 'NLP', 'practice', 'ml', ['nlp', 'natural language processing', 'text classification'], { related: ['ml', 'python'] }),
   t('scraping', 'Web scraping', 'practice', 'data', ['web scraping', 'scraper', 'scrapers', 'scrapy', 'puppeteer', 'playwright scraping', 'crawler', 'crawlers'], { related: ['python', 'nodejs'] }),
   t('dataviz', 'Data visualization', 'practice', 'data', ['data visualization', 'tableau', 'power bi', 'd3.js'], { related: ['sql'] }),
