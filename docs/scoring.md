@@ -14,8 +14,8 @@ Each requirement extracted from the post gets one row:
 | partial | only a related technology is evidenced (for example Docker for Kubernetes), or the technology is covered but the years are not |
 | uncovered | no usable fact |
 
-Only facts the claim policy accepts count: stale facts, self-declared numbers and outcomes, and
-unverified superlatives are excluded (see [domain](domain.md)). Every row cites the fact ids it rests on.
+Only facts the claim policy accepts count: stale facts, numbers and outcomes without verified evidence, and
+unverified superlatives are excluded (see [domain](domain.md)). "Verified" is recomputed from the evidence file each time facts are used. Every row cites the fact ids it rests on.
 
 Requirement priority comes from the nearest cue in the sentence ("required", "must", "a plus",
 "nice to have"), then from the section heading, and otherwise defaults to must-have. Each row records

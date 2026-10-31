@@ -21,6 +21,13 @@ For `file-hash`, `command-output` and `document` the file is hashed at that mome
 checkable file later: a match re-verifies the fact, a changed or missing file makes it `stale`, and stale
 facts are never used in a proposal.
 
+The `status` field of the file is never taken on trust. Every command that uses facts (`analyze`, `draft`, `check`, `approve`,
+`export`, `facts list`) re-hashes the evidence of each checkable fact first, and a fact is `verified` exactly when its file hashes to
+the recorded digest right now. If a file was edited, moved or deleted, the fact is treated as stale for that run and the command prints
+a `notice:` naming the fact; `facts verify` is what updates the file. A hand-written `"verified"` with a made-up digest is stale the
+first time it is used. Evidence files are hashed as they are on disk, so keep them out of editors that rewrite line endings, and
+note that a symbolic link, a FIFO or any other non-regular file is refused: point at the file itself.
+
 ## Writing good claims
 
 - A short statement without pronouns, 8 to 200 characters, one line, no links or contact details:
@@ -28,8 +35,9 @@ facts are never used in a proposal.
   verbatim after a short lead-in, so it should read well on its own.
 - Name technologies the way you would in a post; they are matched through a dictionary of canonical ids and
   synonyms (`src/domain/dictionary/tech.ts`). Tags add technologies the claim does not name.
-- Numbers, years and outcomes ("five years", "40% faster", "10k users") need evidence beyond
-  `self-declared`, otherwise the fact is accepted but never used in a proposal. `facts list` shows why.
+- Numbers, years and outcomes ("five years", "40% faster", "10k users") need **verified** evidence: a local file the tool re-hashes.
+  A link (`repo-url`) or a self-declaration is not enough, and such a fact is accepted but never used in a proposal. `facts list`
+  shows why. The same words are recognised in any notation (`3x`, `90ms`, `ten`, `10yrs`, `１０`).
 - No superlatives ("best", "expert", "world-class") unless the fact is `verified`.
 
 ## Your own terms

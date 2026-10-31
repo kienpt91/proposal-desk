@@ -1,6 +1,6 @@
 # 0005. An independent verifier is the gate
 
-Status: accepted (2026-10-31)
+Status: accepted (2026-10-31); hardened after a security review (see below)
 
 ## Context
 
@@ -15,6 +15,22 @@ unsafe characters, length over the cap, more than one question, offers below the
 and location claims that contradict facts, and mismatches with the job's constraints. It does not read the
 provenance. `draftProposal` runs it on its own output and refuses to return a draft that fails; `approve` and
 `export` run it again with the current facts. `check` exits with status 1 on errors.
+
+### Hardening
+
+The first version exempted any sentence containing a word such as "not" from the technology and claim checks, accepted any sentence that contained a fact's claim
+whatever else it said, found only ASCII digits and ASCII spellings, and silently ignored text after a Provenance heading. It now:
+
+- judges **clauses**: a negator exempts a technology mention only when it is tied to an experience word in the same clause ("no verified experience with
+Redis", "have not worked with"); "but", "however", "and I built", ";" end its scope;
+- checks what is **left of a sentence** after the words of the facts it repeats, for claims about the author (verbs such as built/led/won/hold, credentials, titles,
+degrees, awards);
+- runs every matcher on **folded text** (invisible characters removed, compatibility and look-alike forms mapped, all digits ASCII) and finds numbers in any notation;
+- extracts the proposal with one **fixed-point** function shared by `check`, `approve` and `export`, accounts for the tail and for HTML comments, and treats
+provenance lines that do not repeat a real fact as forged;
+- is linear on hostile input and stops at 250 sentences and 100 findings.
+
+It remains a pattern matcher; SECURITY.md lists what it does not check.
 
 ## Alternatives
 

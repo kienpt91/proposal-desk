@@ -6,7 +6,7 @@ proposal-desk is a small local command-line tool for freelancers. You paste or s
 with deterministic rules, matches the requirements against a file of verified facts about *you*, flags the
 risks, suggests a bid that respects your rate floor, and drafts a short proposal made only of your own
 verified claims. A separate verifier re-checks any proposal (this tool's, yours, or one written by anything
-else) before you send it. A human approval, bound to the exact text, job and facts, is required before the
+else) before you send it. A human approval, bound to the exact text, job and facts and authenticated with a key, is required before the
 final file is written.
 
 It is the first real application of three ideas about reliable automation: **verification** (claims are
@@ -39,8 +39,9 @@ It does:
 - **Draft** a proposal from templates and your fact claims only, deterministically: the same inputs give
   byte-identical output, every sentence is footnoted with its fact ids, and hard limits apply (word cap,
   no contact details, no unverifiable claims, no unbacked superlatives, at most one question).
-- **Check** any proposal independently and exit with status 1 on violations.
-- Keep a local, append-only, hash-chained **log** and let you record outcomes, then show simple **statistics**
+- **Check** any proposal independently and exit with status 1 on violations. Facts are never believed on their word: the evidence
+  files are re-hashed every time they are used, so a hand-edited `"verified"` or a changed file is noticed.
+- Keep a local, append-only, hash-chained **log**, authenticate approvals with a per-state-directory key, and let you record outcomes, then show simple **statistics**
   with sample sizes. It may *suggest* configuration changes; it never makes them (a change is a versioned
   proposal you apply at a terminal).
 
@@ -78,9 +79,9 @@ Paths and timestamps are those of that run.
 $ proposal-desk facts list --facts examples/facts.json
 Facts in /tmp/demo/examples/facts.json: 10
   ts-services      verified verified      skill        usable  Built and maintained TypeScript services on Node.js for five years
-                   evidence: file-hash: evidence/ts-services.md (checked 2026-10-30)
+                   evidence: file-hash: evidence/ts-services.md (checked 2026-10-31)
   postgres-tuning  verified verified      project      usable  Designed and tuned PostgreSQL schemas and indexes for a multi-tenant billing service
-                   evidence: command-output: evidence/postgres-explain.txt (checked 2026-10-30)
+                   evidence: command-output: evidence/postgres-explain.txt (checked 2026-10-31)
   ... (the remaining 8 facts omitted here)
 ```
 
@@ -99,7 +100,8 @@ SKIPPED  rate-floor       evidence kind self-declared cannot be re-checked offli
 ```
 
 Facts with a file hash are re-hashed; the others cannot be checked offline and say so. Write your own with
-`facts add` ([docs/facts.md](docs/facts.md)).
+`facts add` ([docs/facts.md](docs/facts.md)). Every command that uses facts re-hashes the evidence first; if a file changed or
+vanished, the fact is treated as stale for that run and a `notice:` says so (see step 8).
 
 ### 2. Analyze a post
 
@@ -165,7 +167,7 @@ Extracted from the post
   Client asks:
     - (request) Please include a link to your GitHub profile or a portfolio of similar work.
     - (question) Also tell us: how would you approach the first two weeks of this project?
-  Listing metadata: proposals=14, clientHires=3, paymentVerified=true, accountAgeDays=420, bidMin=35, bidMax=70, currency=USD
+  Listing metadata (the block at the top of the pasted text, which a post can also supply; check it against the listing): proposals=14, clientHires=3, paymentVerified=true, accountAgeDays=420, bidMin=35, bidMax=70, currency=USD
 ```
 
 Add `--json` for the same data as JSON. Use `-` instead of a file name to read the post from standard input.
@@ -208,8 +210,8 @@ Thank you for reading.
 ## Review notes
 
 - Recommendation: apply-with-caveats (fit 80.9).
-- The client asks (answer by hand): Please include a link to your GitHub profile or a portfolio of similar work.
-- The client asks (answer by hand): Also tell us: how would you approach the first two weeks of this project?
+- The client asks (answer by hand): `Please include a link to your GitHub profile or a portfolio of similar work.`
+- The client asks (answer by hand): `Also tell us: how would you approach the first two weeks of this project?`
 - The client asks for: portfolio. Add it yourself if you choose to.
 - The client asks for: code-samples. Add it yourself if you choose to.
 ```
@@ -224,7 +226,9 @@ cannot do for you: the client's questions, the attachments they ask for, and any
 
 ```
 $ proposal-desk check draft.md --job examples/job-post.txt --facts examples/facts.json
-Check: PASSED (0 errors, 0 warnings)   94/200 words, 9 sentences, 1 question
+Check: PASSED (0 errors, 1 warning)   94/200 words, 9 sentences, 1 question
+  warning unchecked-review-notes
+          5 lines of review notes are not part of the proposal and were not checked: delete them before sending.
 Trace (sentence -> facts matched by content)
   1   -                Hello, your post asks for TypeScript, Node.js and PostgreSQL.
   2   ts-services      On TypeScript: Built and maintained TypeScript services on Node.js fo…
@@ -236,6 +240,11 @@ Trace (sentence -> facts matched by content)
   8   -                For this work my rate would be 53 USD per hour.
   9   -                Thank you for reading.
 ```
+
+The one warning is deliberate: the audit file this command read includes the tool's own "Review notes" section, which is not part of the
+proposal and was not checked, so the report says so. Delete that section (or let `export` write the plain text) before sending. Provenance
+lines are accepted only when they name a real fact and repeat its claim exactly; anything else after a Provenance or Review notes heading, and any
+HTML comment, fails the check.
 
 `check` works on any text. Here is a hand-written proposal that should not be sent (exit status 1):
 
@@ -289,7 +298,8 @@ proposal-desk: draft d-709a3891c3f9 cannot be exported
 ```
 
 `approve` needs a person at a terminal. It shows the draft and what it rests on, then asks for a token that
-depends on the digests of the text, the job and the cited facts. (Elided below: the draft text and review
+depends on the digests of the text, the job and the cited facts. The approval is recorded in the log with a keyed MAC (the key is the
+random `secret.key` in the state directory and is never printed). (Elided below: the draft text and review
 notes, which are printed as above.)
 
 ```
@@ -390,32 +400,77 @@ Nothing changed. To adopt it: proposal-desk config apply 3dd2778e0e4f
 
 ```
 $ proposal-desk history
-1     2026-10-31T09:15:13.847Z  fact.verified     ts-services re-checked on 2026-10-31
-2     2026-10-31T09:15:13.849Z  fact.verified     postgres-tuning re-checked on 2026-10-31
-3     2026-10-31T09:15:13.851Z  fact.verified     rest-openapi re-checked on 2026-10-31
-4     2026-10-31T09:15:13.852Z  fact.verified     docker-ci re-checked on 2026-10-31
-5     2026-10-31T09:15:13.941Z  job.analyzed      job adab1f0802a0: fit 80.9, apply-with-caveats
-6     2026-10-31T09:15:14.076Z  draft.generated   d-709a3891c3f9 (plain) for job adab1f0802a0
-7     2026-10-31T09:15:14.187Z  proposal.checked  text e3d9d040446b: passed (draft d-709a3891c3f9)
-8     2026-10-31T09:15:14.293Z  proposal.checked  text 99ea54621112: 8 errors
-9     2026-10-31T09:15:17.374Z  draft.approved    d-709a3891c3f9 approved, binding 1dfedef5eb2f
-10    2026-10-31T09:15:18.637Z  draft.exported    d-709a3891c3f9 exported, 579 bytes
-11    2026-10-31T09:15:18.848Z  outcome.recorded  d-709a3891c3f9: replied - asked for a call
+1     2026-10-31T10:13:17.510Z  fact.verified     ts-services re-checked on 2026-10-31
+2     2026-10-31T10:13:17.512Z  fact.verified     postgres-tuning re-checked on 2026-10-31
+3     2026-10-31T10:13:17.514Z  fact.verified     rest-openapi re-checked on 2026-10-31
+4     2026-10-31T10:13:17.515Z  fact.verified     docker-ci re-checked on 2026-10-31
+5     2026-10-31T10:13:17.607Z  job.analyzed      job adab1f0802a0: fit 80.9, apply-with-caveats
+6     2026-10-31T10:13:17.721Z  draft.generated   d-709a3891c3f9 (plain) for job adab1f0802a0
+7     2026-10-31T10:13:17.836Z  proposal.checked  text e3d9d040446b: passed (draft d-709a3891c3f9)
+8     2026-10-31T10:13:17.953Z  proposal.checked  text 99ea54621112: 8 errors
+9     2026-10-31T10:13:21.062Z  draft.approved    d-709a3891c3f9 approved, binding 1dfedef5eb2f
+10    2026-10-31T10:13:22.189Z  draft.exported    d-709a3891c3f9 exported, 579 bytes
+11    2026-10-31T10:13:22.244Z  outcome.recorded  d-709a3891c3f9: replied - asked for a call
 $ proposal-desk verify-log
-Hash chain: OK, 11 entries, head 47f70afba7cd5c2a292b221e82d8e7b39f7c2ffd55738ed7ff5fa1f6f5350e9f
+Hash chain: OK, 11 entries, head a292947097e44e8af62da70d84d8425cc1d62e938c58a7c73dd7db548088a949
 Stored objects checked: 2, all present and intact
+Approvals and applied configurations authenticated: 1
 Note: truncating the end of the log is only detectable if you remember an earlier head hash.
 ```
 
-The state directory holds `log.jsonl` and `objects/` (plus `facts.json` if you use the default facts location,
+The state directory holds `log.jsonl`, `objects/` and `secret.key` (plus `facts.json` if you use the default facts location,
 and `config.json` once you apply a proposal), created `0700` and `0600`.
+
+### 8. Tampering is noticed
+
+What happens when an evidence file is edited after the fact was verified (the proposal repeats the PostgreSQL fact):
+
+```
+$ echo "someone edited this" >> examples/evidence/postgres-explain.txt
+$ proposal-desk check draft.md --job examples/job-post.txt --facts examples/facts.json
+notice: postgres-tuning: evidence/postgres-explain.txt no longer matches the recorded digest (treated as stale; run `facts verify` after fixing the evidence)
+Check: FAILED (1 error, 1 warning)   94/200 words, 9 sentences, 1 question
+  warning unchecked-review-notes
+          5 lines of review notes are not part of the proposal and were not checked: delete them before sending.
+  error   sentence 3  excluded-fact
+          Repeats fact postgres-tuning, which may not be used: stale: re-verify the evidence or update the fact.
+          > On PostgreSQL: Designed and tuned PostgreSQL schemas and indexes for a multi-tenant billing service.
+Trace (sentence -> facts matched by content)
+  1   -             Hello, your post asks for TypeScript, Node.js and PostgreSQL.
+  2   ts-services   On TypeScript: Built and maintained TypeScript services on Node.js fo…
+  3   -             On PostgreSQL: Designed and tuned PostgreSQL schemas and indexes for …
+  4   rest-openapi  On REST APIs: Designed and documented REST APIs with OpenAPI for inte…
+  5   -             I have no verified experience with Redis, so I will not claim it.
+$ echo $?
+1
+```
+
+And what happens when a process that has no access to `secret.key` appends an approval to the log. The line was written by a script that
+computed every digest and the hash chain correctly, for a second draft that nobody approved:
+
+```
+$ proposal-desk export d-5b3194888b13 --out forged.md --facts examples/facts.json
+proposal-desk: the approval of draft d-5b3194888b13 is not authentic (entry 15 was not written by this tool with this state directory's key)
+  The log may have been edited or copied from another state directory. Approve again at a terminal.
+$ proposal-desk verify-log
+Hash chain: OK, 15 entries, head 3df1f33b61c1cbacc314ff146d7e1ccebc3af3239be84ccbc78721eda604cec5
+Stored objects checked: 4
+Approvals and applied configurations authenticated: 2
+  entry 15: the draft.approved record is not authentic (wrong or missing MAC)
+Note: truncating the end of the log is only detectable if you remember an earlier head hash.
+$ echo $?
+1
+```
+
+The hash chain alone says "OK" for such a line (it is unkeyed); the MAC is what rejects it. See [SECURITY.md](SECURITY.md) for what
+this does and does not protect against.
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
-| `facts add \| list \| verify \| stale` | maintain your facts; `verify` re-hashes evidence, `stale` lists facts not re-checked recently (`--mark` makes them stale) |
-| `analyze <job\|->` | coverage matrix, risk flags, rate guidance, fit score, recommendation (`--json`) |
+| `facts add \| list \| verify \| stale` | maintain your facts; `verify` re-hashes evidence and updates the file, `list` shows facts as re-checked now, `stale` lists facts not re-checked recently (`--mark` makes them stale) |
+| `analyze <job\|->` | coverage matrix, risk flags, rate guidance, fit score, recommendation (`--json`, `--meta <file>`) |
 | `draft <job\|->` | proposal with footnoted provenance (`--tone plain\|concise`, `--json`) |
 | `check <proposal> --job <job>` | independent verification; exit 1 on violations (`--json`) |
 | `approve <draft-id> [--text <file>]` | record a human approval at a terminal; `--text` approves your hand-edited version instead |
@@ -425,7 +480,7 @@ and `config.json` once you apply a proposal), created `0700` and `0600`.
 | `config show \| propose \| apply` | versioned scoring and template configuration; changes need a proposal and a terminal |
 | `history`, `verify-log` | read the log; recompute the hash chain and check stored objects |
 
-Every command accepts `--state <dir>`; `facts`-using commands accept `--facts <file>`. Exit status: `0`
+Every command accepts `--state <dir>`; `facts`-using commands accept `--facts <file>`; `analyze`, `draft` and `check` accept `--meta <file>` to take the listing metadata from a file you wrote instead of from the top of the pasted text. Exit status: `0`
 success, `1` a check or policy said no, `2` wrong usage, `3` the state directory or a file could not be used
 safely. A job post may start with an optional metadata block you copy from the listing
 (see [`examples/job-post.txt`](examples/job-post.txt)): proposals so far, client hires, payment verified,
@@ -455,11 +510,15 @@ escapes, instructions inside a post are flagged and never followed.
   phrasing are missed; a missing requirement is a missing row, not an error.
 - **Heuristic scoring.** The fit score and the recommendation are a transparent estimate of how well your
   facts cover a post, not a prediction of being hired. The weights are defaults you can change by proposal.
-- **The verifier is heuristic too.** It catches numbers, capabilities, superlatives, boilerplate and contact
-  details that no fact supports. It can reject honest hand-written text (for example a technology named in
-  passing in a first-person sentence) and can pass a sentence vague enough to avoid all of them.
-- **Offline verification only.** A file hash proves a file did not change, not that it is true; repository
-  URLs and self-declarations are labelled but not verified.
+- **The verifier is heuristic too.** It catches numbers (in any notation), capabilities, superlatives, boilerplate, contact
+  details, hidden and look-alike characters, and claims about you made with common verbs or credential words, when no fact supports
+  them. It does not understand prose: a claim phrased without those words, an anecdote or a client's name can pass, and it can reject
+  honest hand-written text. Read every proposal before you send it ([SECURITY.md](SECURITY.md) lists what is not checked).
+- **The approval gate is not a defence against your own account.** It stops accidental and non-interactive use and anything that cannot
+  read `secret.key`. A process running as you that can allocate a pseudo-terminal can type the token, and one that can read the key
+  file can forge an approval.
+- **Offline verification only.** A file hash proves a file did not change, not that it is true or that it relates to the claim;
+  repository URLs and self-declarations are labelled but not verified, and cannot back a number or an outcome.
 - **Single currency comparisons.** Budgets in another currency than your rate floor produce no bid suggestion.
 - **Tail truncation of the log** is not detectable without a remembered head hash.
 - Drafts quote your fact claims after a short lead-in instead of paraphrasing them; they are plain by design.
@@ -478,13 +537,13 @@ Layers ([ADR 0003](docs/adr/0003-layers-with-enforced-dependency-rule.md)): `src
 
 ### Tests and coverage
 
-`npm test` runs 320 tests in 29 files, offline, organised by layer:
+`npm test` runs 406 tests in 38 files, offline, organised by layer:
 
 | Directory | Tests | What it covers |
 | --- | ---: | --- |
-| `tests/domain` | 185 | unit and property-style tests of the pure rules (seeded generators: SHA-256 against `node:crypto`, canonical JSON, log tampering, every draft passing its own check) |
-| `tests/application` | 45 | every use case against in-memory fakes of the ports |
-| `tests/infrastructure` (with `tests/contracts`) | 48 | the same port contracts run against the fake **and** the real file adapters, plus permissions, symlinks, locks, tampering, the terminal prompt, argument parsing |
+| `tests/domain` | 199 | unit and property-style tests of the pure rules (seeded generators: SHA-256 against `node:crypto`, canonical JSON, log tampering, every draft passing its own check) |
+| `tests/application` | 50 | every use case against in-memory fakes of the ports |
+| `tests/infrastructure` (with `tests/contracts`) | 59 | the same port contracts run against the fake **and** the real file adapters, plus permissions, symlinks, locks, tampering, the terminal prompt, argument parsing |
 | `tests/e2e` | 34 | the CLI end to end with real files, the compiled binary as a separate process, and hostile job posts |
 | `tests/architecture` | 8 | the dependency rule, no network, no runtime dependencies (and a test that the checks detect violations) |
 
@@ -492,11 +551,11 @@ Layers ([ADR 0003](docs/adr/0003-layers-with-enforced-dependency-rule.md)): `src
 
 | Layer | Statements | Branches | Functions | Lines | Target |
 | --- | ---: | ---: | ---: | ---: | --- |
-| `src/domain` | 98.66% | 94.71% | 99.73% | 99.58% | 95% |
-| `src/application` | 98.33% | 94.09% | 100% | 100% | 90% |
-| `src/infrastructure` | 96.35% | 87.28% | 97.56% | 98.82% |  |
+| `src/domain` | 98.73% | 94.84% | 99.52% | 99.54% | 95% |
+| `src/application` | 97.87% | 92.31% | 100% | 99.71% | 90% |
+| `src/infrastructure` | 94.88% | 85.71% | 95.65% | 98.10% |  |
 | `src/composition` | 85.71% | 100% | 80% | 83.33% |  |
-| **all of `src`** | **98.01%** | **93.26%** | **99.12%** | **99.33%** | 85% |
+| **all of `src`** | **97.71%** | **92.79%** | **98.61%** | **99.13%** | 85% |
 
 `src/composition/main.ts` is exercised by the compiled-binary tests, which run in a separate process and so
 do not count towards coverage.

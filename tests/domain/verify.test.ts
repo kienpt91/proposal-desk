@@ -132,3 +132,26 @@ describe('verifier wording', () => {
     expect(details).toContain('Kubernetes is not covered by any verified fact.');
   });
 });
+
+describe('claims that need verified evidence', () => {
+  const declaredLink = (claim: string) =>
+    factBase(fact({ id: 'linked', claim, status: 'declared', checkedAt: undefined, tags: ['typescript'], evidence: { kind: 'repo-url', reference: 'https://github.com/example/service', digest: undefined } }));
+  const stale = (claim: string) => factBase(fact({ id: 'old', claim, status: 'stale', tags: ['typescript'] }));
+
+  it('fails when a proposal repeats a number or outcome that only a link or a stale fact supports', () => {
+    const claim = 'Served 10k users with a TypeScript service';
+    expect(rules(`${claim}.`, JOB, declaredLink(claim))).toContain('excluded-fact');
+    expect(rules(`I ${claim.toLowerCase().replace('served', 'served')}.`, JOB, declaredLink(claim))).toEqual(expect.arrayContaining(['untraceable-number']));
+    expect(rules(`${claim}.`, JOB, stale(claim))).toContain('excluded-fact');
+    expect(check(`${claim}.`, JOB, declaredLink(claim)).ok).toBe(false);
+  });
+
+  it('accepts the same claim once its evidence is a file the tool verified, and only warns for a plain skill resting on a link', () => {
+    const claim = 'Served 10k users with a TypeScript service';
+    expect(rules(`${claim}.`, JOB, factBase(fact({ id: 'proven', claim, tags: ['typescript'] })))).toEqual([]);
+    const skill = declaredLink('Built command line tools in TypeScript');
+    const r = check('Built command line tools in TypeScript.', JOB, skill);
+    expect(r.ok).toBe(true);
+    expect(r.violations.map((v) => `${v.rule}:${v.severity}`)).toEqual(['unverified-evidence:warning']);
+  });
+});

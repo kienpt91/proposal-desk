@@ -1,6 +1,6 @@
 # 0006. Human approval, bound to digests, at a terminal only
 
-Status: accepted (2026-10-31)
+Status: accepted (2026-10-31); amended by [0011](0011-authenticated-approvals.md): the approval record carries a keyed MAC that `export` verifies, and the limits against a same-user adversary are documented.
 
 ## Context
 

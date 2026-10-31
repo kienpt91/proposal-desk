@@ -19,6 +19,8 @@ same terminal confirmation as approval, and writes the new version. Templates ar
 contact details, no boilerplate or superlatives, only whitelisted placeholders, so a template cannot smuggle a
 claim into a draft. There is no self-modifying code.
 
+`config.json` is honoured only if it matches the last authenticated `config.applied` entry ([0011](0011-authenticated-approvals.md)), so editing the file by hand changes nothing.
+
 ## Consequences
 
 Improvement is slow and deliberate. The statistics are correlations in a small personal sample and are

@@ -1,6 +1,6 @@
 # 0007. Hash-chained log and content-addressed objects
 
-Status: accepted (2026-10-31)
+Status: accepted (2026-10-31); amended by [0011](0011-authenticated-approvals.md): the chain is not authentication, so approvals and applied configurations carry a keyed MAC; `export` and configuration loading verify the chain first.
 
 ## Context
 

@@ -1,6 +1,6 @@
 # 0004. Facts, and "verified" means mechanically checkable
 
-Status: accepted (2026-10-31)
+Status: accepted (2026-10-31); amended by [0012](0012-recheck-evidence-at-use-time.md): the status is recomputed from the evidence every time facts are used, and numbers need verified evidence.
 
 ## Context
 

@@ -17,7 +17,7 @@ The ubiquitous language. These words mean the same thing in the code, the CLI, t
 | **Mechanically checkable** | Evidence the tool can re-check offline: a local file whose SHA-256 is recorded (`file-hash`, `command-output`, `document`). |
 | **Status** | `verified` (checkable evidence, re-hashed successfully), `declared` (anything else) or `stale` (evidence changed, disappeared or is overdue). |
 | **Trust** | Derived: `verified`, `evidenced` (evidence exists but cannot be verified offline) or `self-declared`. Shown on every cited fact. |
-| **Claim policy** | The rule that decides whether a fact may appear in a proposal: no stale facts, no self-declared numbers or outcomes, no superlatives without verified evidence. |
+| **Claim policy** | The rule that decides whether a fact may appear in a proposal: no stale facts, no numbers or outcomes without verified evidence, no superlatives without verified evidence. |
 | **Usable fact** | A fact the claim policy accepts. Only usable facts count for coverage and drafting. |
 | **Job post** | The pasted text, untrusted. Optionally preceded by a **metadata block** of listing facts you copy yourself. |
 | **Requirement** | Something the post asks for: a technology (via the technology dictionary), years of experience, a language, availability, a location or a timezone. Has a priority: **must-have** or **nice-to-have**. |
@@ -29,12 +29,14 @@ The ubiquitous language. These words mean the same thing in the code, the CLI, t
 | **Draft** | A proposal assembled from templates and fact claims. Every sentence carries the ids of the facts it rests on. Identified by `d-` plus 12 hex characters of its content digest. |
 | **Provenance** | The footnotes and JSON `factIds` that tie each claim to a fact. |
 | **Check** | The independent verifier. It ignores provenance and matches sentences to facts by content. |
-| **Approval** | A human decision recorded at a terminal, bound to the digests of the draft text, the job text and the cited facts. |
+| **Approval** | A human decision recorded at a terminal, bound to the digests of the draft text, the job text and the cited facts, and authenticated with a keyed MAC. |
+| **Secret key** | The random key in `<state>/secret.key` that authenticates approvals and applied configurations. Never printed or logged. |
+| **Authenticated entry** | A log entry (`draft.approved`, `config.applied`) whose payload carries `mac`, an HMAC over its type, its payload and the hash of the entry before it. |
 | **Export** | Writing an approved, unchanged draft to a Markdown file. The tool never sends anything. |
 | **Outcome** | What happened after you sent a proposal: `replied`, `interview`, `hired`, `no-response` or `declined`. |
 | **Insight** | A statistic over outcomes (reply rate by flags, fit band, bid against budget, tone), always with its sample size. |
 | **Configuration** | Versioned data: scoring weights, thresholds, risk limits, word cap, templates. Changed only through a **proposal** that a human applies. |
-| **State directory** | Private directory with the log, stored objects and active configuration. |
+| **State directory** | Private directory with the log, stored objects, active configuration and secret key. |
 | **Log** | Append-only, hash-chained record of what happened. Entries refer to **objects** (job texts, draft records, proposals) by digest. |
 
 ## Bounded contexts

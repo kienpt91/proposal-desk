@@ -16,3 +16,5 @@ new record that supersedes the old one, not by editing history.
 | [0008](0008-learning-proposes-never-applies.md) | Learning from outcomes proposes; a human applies |
 | [0009](0009-untrusted-job-text.md) | Job text is untrusted data |
 | [0010](0010-zero-runtime-dependencies.md) | Zero runtime dependencies |
+| [0011](0011-authenticated-approvals.md) | Approvals and applied configurations carry a keyed MAC |
+| [0012](0012-recheck-evidence-at-use-time.md) | Evidence is re-checked every time facts are used |
