@@ -27,9 +27,9 @@ const KNOWN_HEADING =
 
 function headingOf(line: string): string | undefined {
   const t = line.trim();
-  if (KNOWN_HEADING.test(t)) return t;
   if (/^[-*•·]\s|^\d+[.)]\s/.test(t)) return undefined;
   const stripped = t.replace(/^#{1,6}\s*/, '').replace(/^\*\*(.+?)\*\*:?$/, '$1');
+  if (KNOWN_HEADING.test(stripped)) return stripped;
   if (/^#{1,6}\s/.test(t)) return stripped.replace(/:$/, '');
   if (stripped.endsWith(':') && stripped.length <= 60 && !/[.?!]\s/.test(stripped)) return stripped.slice(0, -1);
   if (/^[A-Z][A-Z &/'-]{3,50}$/.test(stripped)) return stripped;
