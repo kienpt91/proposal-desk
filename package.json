@@ -1,0 +1,46 @@
+{
+  "name": "proposal-desk",
+  "version": "0.1.0",
+  "description": "Decide quickly whether a job post is worth applying to, and draft a proposal in which every claim is backed by a verified fact. Local, deterministic, no network.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Kien Phan <kienphan.dev@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kienpt91/proposal-desk.git"
+  },
+  "keywords": [
+    "freelance",
+    "proposal",
+    "cover-letter",
+    "verification",
+    "evidence",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "bin": {
+    "proposal-desk": "dist/composition/main.js"
+  },
+  "files": [
+    "dist",
+    "examples",
+    "docs",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
+    "secret-scan": "sh scripts/secret-scan.sh --tree"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@vitest/coverage-v8": "5.0.5",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
+  }
+}
