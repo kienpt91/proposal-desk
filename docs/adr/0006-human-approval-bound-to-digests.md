@@ -16,6 +16,10 @@ text and the digest of the cited facts as they were at drafting time. `export` f
 the draft, recomputes all three digests from the current state, re-runs the verifier, and writes the file only
 if everything still matches. There is no flag or environment variable that skips the prompt.
 
+Hand edits are supported without weakening this: `approve <draft-id> --text edited.md` runs the same verifier on
+the edited text, stores it as an object, and binds the approval to *its* digest; `export` then writes exactly
+that text. Text that fails the check cannot be approved.
+
 ## Alternatives
 
 - **`--yes`.** Convenient for scripts, which is exactly the thing to prevent. Rejected.
