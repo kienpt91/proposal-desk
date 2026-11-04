@@ -564,6 +564,10 @@ do not count towards coverage.
 Secrets: `lefthook.yml` runs `scripts/secret-scan.sh --staged` before every commit and `--tree` before every
 push; CI runs both the tree and the whole-history scan.
 
+## Releasing
+
+Releases are cut by pushing a `vMAJOR.MINOR.PATCH` tag. The `release` workflow then verifies the code, builds the files, writes `SHA256SUMS`, attests where they were built and creates the GitHub release. See [RELEASING.md](RELEASING.md) for how to cut a release and how to verify a download with `gh attestation verify`.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
