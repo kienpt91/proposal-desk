@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { defaultConfig } from '../../src/domain/config/config.js';
 import { proposalBody, verifyProposal, type ViolationRule } from '../../src/domain/proposal/verify.js';
+import { growth, MAX_GROWTH } from '../support/growth.js';
 import { draftIdOf, read, session } from '../support/cli.js';
 import { job, typicalFacts } from '../support/analysis.js';
 import { forSeeds } from '../support/random.js';
@@ -168,23 +169,22 @@ describe('check says what it did not look at', () => {
 
 describe('the verifier stays fast on hostile input', () => {
   it('handles unclosed markup, thousands of tiny sentences and huge inputs in linear time', () => {
-    const samples = [
-      '['.repeat(120_000),
-      '[^'.repeat(60_000),
-      '<!--'.repeat(30_000),
-      `${'[a]('.repeat(30_000)}`,
-      'A. '.repeat(40_000),
-      `${FACT} `.repeat(2_000),
-      '`'.repeat(100_000),
-      `${'I built it. '.repeat(20_000)}`,
+    // [unit, repeat count at full size]; the full-size input must still be rejected, and the cost must grow linearly with the count.
+    const samples: Array<[string, number]> = [
+      ['[', 120_000],
+      ['[^', 60_000],
+      ['<!--', 30_000],
+      ['[a](', 30_000],
+      ['A. ', 40_000],
+      [`${FACT} `, 2_000],
+      ['`', 100_000],
+      ['I built it. ', 20_000],
     ];
-    for (const [i, sample] of samples.entries()) {
-      const started = Date.now();
-      const r = report(sample.slice(0, 262_144));
-      expect(Date.now() - started, `sample ${i}`).toBeLessThan(5_000);
-      expect(r.ok, `sample ${i}`).toBe(false);
+    for (const [i, [unit, count]] of samples.entries()) {
+      expect(report(unit.repeat(count).slice(0, 262_144)).ok, `sample ${i}`).toBe(false);
+      expect(growth((n) => unit.repeat(n), count / 8, (text) => report(text)), `sample ${i}`).toBeLessThan(MAX_GROWTH);
     }
-  }, 60_000);
+  }, 120_000);
 
   it('rejects a proposal that is empty once markup is taken out', () => {
     for (const text of ['', '   ', '`'.repeat(50), '<!-- only a comment -->', '## Provenance\n\n[^1]: x']) expect(rules(text), JSON.stringify(text)).toContain('empty-proposal');
